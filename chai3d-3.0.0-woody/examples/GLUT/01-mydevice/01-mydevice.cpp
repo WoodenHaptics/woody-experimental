@@ -43,6 +43,7 @@
 
 //------------------------------------------------------------------------------
 #include "chai3d.h"
+#include "devices/CWoodenDevice.h"
 //------------------------------------------------------------------------------
 using namespace chai3d;
 using namespace std;
@@ -98,9 +99,16 @@ cLabel* labelHapticDeviceModel;
 
 // a label to display the position [m] of the haptic device
 cLabel* labelHapticDevicePosition;
+cLabel* labelHapticDeviceForce;
+cLabel* labelHapticDeviceTorqueSignal;
+cLabel* labelHapticDeviceEncoders;
 
 // a global variable to store the position [m] of the haptic device
 cVector3d hapticDevicePosition;
+cVector3d hapticDeviceForce;
+cVector3d hapticDeviceTorqueSignal;
+cVector3d hapticDeviceEncoders;
+
 
 // a label to display the rate [Hz] at which the simulation is running
 cLabel* labelHapticRate;
@@ -347,7 +355,16 @@ int main(int argc, char* argv[])
     // create a label to display the position of haptic device
     labelHapticDevicePosition = new cLabel(font);
     camera->m_frontLayer->addChild(labelHapticDevicePosition);
-    
+
+    labelHapticDeviceForce = new cLabel(font);
+    camera->m_frontLayer->addChild(labelHapticDeviceForce);
+
+    labelHapticDeviceTorqueSignal = new cLabel(font);
+    camera->m_frontLayer->addChild(labelHapticDeviceTorqueSignal);
+
+    labelHapticDeviceEncoders = new cLabel(font);
+    camera->m_frontLayer->addChild(labelHapticDeviceEncoders);
+
     // create a label to display the haptic rate of the simulation
     labelHapticRate = new cLabel(font);
     camera->m_frontLayer->addChild(labelHapticRate);
@@ -480,16 +497,22 @@ void updateGraphics(void)
     /////////////////////////////////////////////////////////////////////
 
     // display new position data
-    labelHapticDevicePosition->setString("position [m]: " + hapticDevicePosition.str(3));
-
+    labelHapticDevicePosition->setString("position [m]: " + hapticDevicePosition.str(3));      
     // display haptic rate data
     labelHapticRate->setString ("haptic rate: "+cStr(frequencyCounter.getFrequency(), 0) + " [Hz]");
+
+    labelHapticDeviceForce->setString("computed force [N] x y z: " + hapticDeviceForce.str(3));
+    labelHapticDeviceTorqueSignal->setString("commanded motor torque signal (motor A, B, C): " + hapticDeviceTorqueSignal.str(3));
+    labelHapticDeviceEncoders->setString("received encoder values (channel A, B, C): " + hapticDeviceEncoders.str(3));
 
     // update position of label
     labelHapticDeviceModel->setLocalPos(10, windowH - 30, 0);
 
     // update position of label
     labelHapticDevicePosition->setLocalPos(10, windowH - 50, 0);
+    labelHapticDeviceForce->setLocalPos(10, windowH - 80, 0);
+    labelHapticDeviceTorqueSignal->setLocalPos(10, windowH - 110, 0);
+    labelHapticDeviceEncoders->setLocalPos(10, windowH - 140, 0);
 
     // update position of label
     labelHapticRate->setLocalPos((int)(0.5 * (windowW - labelHapticRate->getWidth())), 15);
@@ -659,8 +682,15 @@ void updateHaptics(void)
             gripperForce = gripperForce - Kvg * gripperAngularVelocity;
         }
 
+
         // send computed force, torque, and gripper force to haptic device	
-        hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+        hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);        
+
+        hapticDeviceForce = force;
+        if(cWoodenDevice* w = dynamic_cast<cWoodenDevice*>(hapticDevice.get())){
+            hapticDeviceTorqueSignal = w->getTorqueSignals();
+            hapticDeviceEncoders = w->getEncoders();
+        }
 
         // update frequency counter
         frequencyCounter.signal(1);

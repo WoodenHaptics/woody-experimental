@@ -65,6 +65,7 @@ CXXFLAGS    += -I$(GLEW_DIR)/include
 CFLAGS      += -I$(GLEW_DIR)/include
 VPATH       += $(GLEW_DIR)/src
 CSOURCES    += $(wildcard $(GLEW_DIR)/src/*.c)
+CSOURCES    += $(shell find $(SRC_DIR) -name '*.c')
 
 # optional dependencies to include in static library (see Makefile.config)
 ifeq ($(USE_EXTERNAL_LIBPNG), no)

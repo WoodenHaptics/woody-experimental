@@ -428,7 +428,7 @@ int main(int argc, char* argv[])
     object1->m_texture->setSphericalMappingEnabled(true);
 
     // set haptic properties
-    object1->m_material->setViscosity(0.9 * maxDamping);    // 90% of maximum linear damping
+    object1->m_material->setViscosity(10 * maxDamping);    // 90% of maximum linear damping
 
     // create a haptic viscous effect
     object1->createEffectViscosity();

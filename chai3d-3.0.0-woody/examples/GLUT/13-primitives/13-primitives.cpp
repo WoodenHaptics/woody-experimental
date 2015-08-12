@@ -43,6 +43,7 @@
 
 //------------------------------------------------------------------------------
 #include "chai3d.h"
+#include "devices/CWoodenDevice.h"
 //------------------------------------------------------------------------------
 using namespace chai3d;
 using namespace std;
@@ -92,6 +93,11 @@ cHapticDeviceHandler* handler;
 
 // a pointer to the current haptic device
 cGenericHapticDevicePtr hapticDevice;
+
+
+cLabel* labelHapticDeviceTorqueSignal;
+cVector3d hapticDeviceTorqueSignal;
+
 
 // a virtual tool representing the haptic device in the scene
 cToolCursor* tool;
@@ -458,6 +464,10 @@ int main(int argc, char* argv[])
     labelHapticRate->m_fontColor.setBlack();
     camera->m_frontLayer->addChild(labelHapticRate);
 
+    labelHapticDeviceTorqueSignal = new cLabel(font);
+    labelHapticDeviceTorqueSignal->m_fontColor.setBlack();
+    camera->m_frontLayer->addChild(labelHapticDeviceTorqueSignal);
+
     // create a background
     cBackground* background = new cBackground();
     camera->m_backLayer->addChild(background);
@@ -583,6 +593,9 @@ void updateGraphics(void)
     // RENDER SCENE
     /////////////////////////////////////////////////////////////////////
 
+    labelHapticDeviceTorqueSignal->setString("commanded motor torque signal (motor A, B, C): " + hapticDeviceTorqueSignal.str(3));
+    labelHapticDeviceTorqueSignal->setLocalPos(10, windowH - 110, 0);
+
     // render world
     camera->renderView(windowW, windowH);
 
@@ -706,10 +719,15 @@ void updateHaptics(void)
 
         /////////////////////////////////////////////////////////////////////////
         // FINALIZE
-        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////               
 
         // send forces to haptic device
         tool->applyForces();  
+
+        if(cWoodenDevice* w = dynamic_cast<cWoodenDevice*>(hapticDevice.get())){
+            hapticDeviceTorqueSignal = w->getTorqueSignals();
+        }
+
     }
     
     // exit haptics thread

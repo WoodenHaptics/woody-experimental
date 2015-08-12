@@ -65,6 +65,27 @@ ifeq ($(USE_DHD),yes)
 LDLIBS   += -lusb-1.0
 endif
 
+# libhid
+LIBS_UDEV = `pkg-config libudev --libs` -lrt
+LDLIBS += $(LIBS_UDEV)
+####
+
+# Sensoray DAQ (WoodenHaptics) dependency
+# Currently only supported in Linux
+USE_S826 ?= yes
+ifeq ($(USE_S826),yes)
+S826_EXT ?= $(TOP_DIR)/external/s826
+S826_LIB ?= $(S826_EXT)/lib
+CXXFLAGS += -DC_ENABLE_WOODEN_DEVICE_SUPPORT
+LDFLAGS  += -L$(S826_LIB)
+ifeq ($(ARCH), x86_64)
+LDLIBS   += -l826_64
+endif
+ifeq ($(ARCH), i686)
+LDLIBS   += -l826
+endif
+endif
+
 # libHD dependency
 USE_LIBHD  ?= yes
 ifeq ($(USE_LIBHD),yes)
