@@ -1,0 +1,8 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classchai3d_1_1c_generic_device.html" title="Abstract class for hardware devices. " alt="" coords="6,81,167,108"/>
+<area shape="rect" id="node2" href="$classchai3d_1_1c_generic_haptic_device.html" title="Abstract class for haptic and tracking devices. " alt="" coords="217,81,415,108"/>
+<area shape="rect" id="node3" href="$classchai3d_1_1c_delta_device.html" title="Interface to Force Dimension haptic devices. " alt="" coords="481,5,628,32"/>
+<area shape="rect" id="node4" href="$classchai3d_1_1c_my_custom_device.html" title="Interface to custom haptic devices (template). " alt="" coords="465,56,645,83"/>
+<area shape="rect" id="node5" href="$classchai3d_1_1c_phantom_device.html" title="Interface to Sensable/Geomagic Phantom haptic devices. " alt="" coords="471,107,639,133"/>
+<area shape="rect" id="node6" href="$classchai3d_1_1c_sixense_device.html" title="Interface to Sixsense tracking devices. " alt="" coords="473,157,636,184"/>
+</map>

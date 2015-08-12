@@ -1,0 +1,7 @@
+<map id="chai3d::cSpotLight" name="chai3d::cSpotLight">
+<area shape="rect" id="node2" href="$classchai3d_1_1c_positional_light.html" title="Positional light source. " alt="" coords="5,229,164,256"/>
+<area shape="rect" id="node3" href="$classchai3d_1_1c_generic_light.html" title="Abstract class for light sources. " alt="" coords="105,155,252,181"/>
+<area shape="rect" id="node6" href="$classchai3d_1_1c_directional_light.html" title="Directional light source. " alt="" coords="189,229,353,256"/>
+<area shape="rect" id="node4" href="$classchai3d_1_1c_generic_object.html" title="Abstract class for virtual 3D objects. " alt="" coords="99,80,257,107"/>
+<area shape="rect" id="node5" href="$classchai3d_1_1c_generic_type.html" title="Abstract type. " alt="" coords="104,5,252,32"/>
+</map>

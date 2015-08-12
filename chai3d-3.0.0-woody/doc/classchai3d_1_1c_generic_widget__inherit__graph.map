@@ -1,0 +1,12 @@
+<map id="chai3d::cGenericWidget" name="chai3d::cGenericWidget">
+<area shape="rect" id="node5" href="$classchai3d_1_1c_dial.html" title="2D Widget Level. " alt="" coords="5,304,104,331"/>
+<area shape="rect" id="node6" href="$classchai3d_1_1c_level.html" title="2D Widget Level. " alt="" coords="128,304,235,331"/>
+<area shape="rect" id="node7" href="$classchai3d_1_1c_panel.html" title="2D Widget Panel. " alt="" coords="259,304,367,331"/>
+<area shape="rect" id="node2" href="$classchai3d_1_1c_mesh.html" title="3D Mesh object " alt="" coords="128,155,235,181"/>
+<area shape="rect" id="node3" href="$classchai3d_1_1c_generic_object.html" title="Abstract class for virtual 3D objects. " alt="" coords="102,80,260,107"/>
+<area shape="rect" id="node4" href="$classchai3d_1_1c_generic_type.html" title="Abstract type. " alt="" coords="107,5,255,32"/>
+<area shape="rect" id="node8" href="$classchai3d_1_1c_bitmap.html" title="2D Widget Bitmap. " alt="" coords="119,379,235,405"/>
+<area shape="rect" id="node10" href="$classchai3d_1_1c_label.html" title="2D Widget Label. " alt="" coords="260,379,367,405"/>
+<area shape="rect" id="node11" href="$classchai3d_1_1c_scope.html" title="2D Widget Scope. " alt="" coords="391,379,501,405"/>
+<area shape="rect" id="node9" href="$classchai3d_1_1c_background.html" title="2D Widget Background. " alt="" coords="105,453,249,480"/>
+</map>
