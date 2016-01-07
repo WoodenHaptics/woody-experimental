@@ -102,13 +102,15 @@ cLabel* labelHapticDevicePosition;
 cLabel* labelHapticDeviceForce;
 cLabel* labelHapticDeviceTorqueSignal;
 cLabel* labelHapticDeviceEncoders;
+cLabel* labelHapticDeviceLostMessages;
+
 
 // a global variable to store the position [m] of the haptic device
 cVector3d hapticDevicePosition;
 cVector3d hapticDeviceForce;
 cVector3d hapticDeviceTorqueSignal;
 cVector3d hapticDeviceEncoders;
-
+int hapticDeviceLostMessages;
 
 // a label to display the rate [Hz] at which the simulation is running
 cLabel* labelHapticRate;
@@ -369,6 +371,9 @@ int main(int argc, char* argv[])
     labelHapticRate = new cLabel(font);
     camera->m_frontLayer->addChild(labelHapticRate);
 
+    labelHapticDeviceLostMessages = new cLabel(font);
+    camera->m_frontLayer->addChild(labelHapticDeviceLostMessages);
+
 
     //--------------------------------------------------------------------------
     // START SIMULATION
@@ -504,6 +509,7 @@ void updateGraphics(void)
     labelHapticDeviceForce->setString("computed force [N] x y z: " + hapticDeviceForce.str(3));
     labelHapticDeviceTorqueSignal->setString("commanded motor torque signal (motor A, B, C): " + hapticDeviceTorqueSignal.str(3));
     labelHapticDeviceEncoders->setString("received encoder values (channel A, B, C): " + hapticDeviceEncoders.str(3));
+    labelHapticDeviceLostMessages->setString("lost messages: " + cStr(hapticDeviceLostMessages));
 
     // update position of label
     labelHapticDeviceModel->setLocalPos(10, windowH - 30, 0);
@@ -513,6 +519,7 @@ void updateGraphics(void)
     labelHapticDeviceForce->setLocalPos(10, windowH - 80, 0);
     labelHapticDeviceTorqueSignal->setLocalPos(10, windowH - 110, 0);
     labelHapticDeviceEncoders->setLocalPos(10, windowH - 140, 0);
+    labelHapticDeviceLostMessages->setLocalPos(10, windowH - 170, 0);
 
     // update position of label
     labelHapticRate->setLocalPos((int)(0.5 * (windowW - labelHapticRate->getWidth())), 15);
@@ -690,6 +697,7 @@ void updateHaptics(void)
         if(cWoodenDevice* w = dynamic_cast<cWoodenDevice*>(hapticDevice.get())){
             hapticDeviceTorqueSignal = w->getTorqueSignals();
             hapticDeviceEncoders = w->getEncoders();
+            hapticDeviceLostMessages = w->lost_messages;
         }
 
         // update frequency counter

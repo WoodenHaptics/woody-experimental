@@ -90,6 +90,23 @@ struct woodenhaptics_message {
                             actual_current_0(0),actual_current_1(0),actual_current_2(0),
                             temperature_0(0),temperature_1(0),temperature_2(0){}
 };
+
+
+
+struct hid_to_pc_message { // 4*2 = 8 bytes
+    short encoder_a;
+    short encoder_b;
+    short encoder_c;
+    unsigned short debug;
+};
+
+struct pc_to_hid_message {  // 4*2 = 8 bytes
+    short current_motor_a_mA;
+    short current_motor_b_mA;
+    short current_motor_c_mA;
+    unsigned int debug;
+};
+
 //------------------------------------------------------------------------------
 
 //==============================================================================
@@ -262,6 +279,8 @@ public:
     */
     ////////////////////////////////////////////////////////////////////////////
 
+    int lost_messages;
+
 protected:
 
     const configuration m_config;
@@ -271,9 +290,13 @@ protected:
     woodenhaptics_message incoming_msg;
     woodenhaptics_message outgoing_msg;
 
+    hid_to_pc_message hid_to_pc;
+    pc_to_hid_message pc_to_hid;
+
+
 
     int res;
-    unsigned char buf[49];// 1 extra byte for the report ID
+    unsigned char buf[9];// 1 extra byte for the report ID
     #define MAX_STR 255
     wchar_t wstr[MAX_STR];
     hid_device *handle;

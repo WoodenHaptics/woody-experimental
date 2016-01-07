@@ -63,7 +63,15 @@
 #include <stdlib.h>
 #include "hidapi.h"
 
+
+
 //#define USB  // define this to use the usb version
+//#define DELAY /// To test delay
+
+// For delay testing
+#include <chrono>
+#include <thread>
+#include <ratio>
 
 //------------------------------------------------------------------------------
 #define C_ENABLE_WOODEN_DEVICE_SUPPORT
@@ -90,6 +98,9 @@
 //------------------------------------------------------------------------------
 namespace chai3d {
 //------------------------------------------------------------------------------
+
+
+
 
 
 std::string toJSON(const woodenhaptics_message& m) {
@@ -262,6 +273,7 @@ cWoodenDevice::cWoodenDevice(unsigned int a_deviceNumber):
 {
     // the connection to your device has not yet been established.
     m_deviceReady = false;
+    lost_messages = 0;
 
 
     ////////////////////////////////////////////////////////////////////////////
@@ -577,7 +589,6 @@ bool cWoodenDevice::close()
     return (result);
 }
 
-
 //==============================================================================
 /*!
     Calibrate your device.
@@ -735,7 +746,7 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
     /*
         STEP 7:
 
-        Here you shall implement code that reads the position (X,Y,Z) from
+        Here you shall implement code that reads the position (X,Y,Z) fromincoming_msg
         your haptic device. Read the values from your device and modify
         the local variable (x,y,z) accordingly.
         If the operation fails return an C_ERROR, C_SUCCESS otherwise
@@ -815,17 +826,22 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
     int res=0;
     while (res == 0) {
         res = hid_read(handle, buf, sizeof(buf));
-        if(res==48) // Got a correct message
-            incoming_msg = *reinterpret_cast<woodenhaptics_message*>(buf);
+        if(res==8) // Got a correct message
+            //incoming_msg = *reinterpret_cast<woodenhaptics_message*>(buf);
+            hid_to_pc = *reinterpret_cast<hid_to_pc_message*>(buf);
         usleep(10);
     }
 
     int flush=0;
     while(int res2 = hid_read(handle, buf, sizeof(buf))){
+        if(res==8) // Got a correct message
+            //incoming_msg = *reinterpret_cast<woodenhaptics_message*>(buf);
+            hid_to_pc = *reinterpret_cast<hid_to_pc_message*>(buf);
         ++flush;
     }
-    if(flush)
-        std::cout << "Flushed " << flush << " messages." << std::endl;
+    //if(flush)
+    //    std::cout << "Flushed " << flush << " messages." << std::endl;
+    lost_messages += flush;
 
 
     /*
@@ -836,9 +852,12 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
     */
 
 
-    double encoder_values[] = { incoming_msg.temperature_0,
-                                incoming_msg.temperature_1,
-                                incoming_msg.temperature_2 };
+//    double encoder_values[] = { incoming_msg.temperature_0,
+//                                incoming_msg.temperature_1,
+//                                incoming_msg.temperature_2 };
+    double encoder_values[] = { hid_to_pc.encoder_a,
+                                hid_to_pc.encoder_b,
+                                hid_to_pc.encoder_c };
     pose p  = calculate_pose(m_config, encoder_values);
     const double& Ln = p.Ln;
     const double& Lb = p.Lb;
@@ -873,7 +892,12 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
 
 #endif
 
-//    usleep(10000);
+
+#ifdef DELAY
+    using namespace std::chrono;
+    duration<int, std::micro> d{400};
+    std::this_thread::sleep_for(d);
+#endif
 
     // store new position values
     a_position.set(x, y, z);
@@ -1031,9 +1055,9 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
     // *** INSERT YOUR CODE HERE ***
 #ifdef USB
-    double encoder_values[] = { incoming_msg.temperature_0,
-                                incoming_msg.temperature_1,
-                                incoming_msg.temperature_2 };
+    double encoder_values[] = { hid_to_pc.encoder_a,
+                                hid_to_pc.encoder_b,
+                                hid_to_pc.encoder_c };
     const pose p = calculate_pose(m_config, encoder_values);
 #else
     const pose p = calculate_pose(m_config,0);
@@ -1087,7 +1111,7 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
                                  m_config.torque_constant_motor_b,
                                  m_config.torque_constant_motor_c };
 
-    float signalToSend[3] = {0,0,0};
+    short signalToSend[3] = {0,0,0};
 
     for(int i=0;i<3;++i){
         double motorAmpere = motorTorque[i] / torque_constant[i];
@@ -1099,7 +1123,7 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
 
 #ifdef USB
-       signalToSend[i] = float(motorAmpere);
+       signalToSend[i] = short(motorAmpere*1000);
 #else
         setVolt(signal,i);
 #endif
@@ -1111,27 +1135,31 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     //signalToSend[2] = 0;
 
 
-    unsigned char out_buf[49];
-    woodenhaptics_message msg;
-    msg.command_force_x = signalToSend[0];
-    msg.command_force_y = signalToSend[1];
-    msg.command_force_z = signalToSend[2];
+    unsigned char out_buf[9];
+
+    //woodenhaptics_message msg;
+    //msg.command_force_x = signalToSend[0];
+    //msg.command_force_y = signalToSend[1];
+    //msg.command_force_z = signalToSend[2];
+    pc_to_hid.current_motor_a_mA = signalToSend[0];
+    pc_to_hid.current_motor_b_mA = signalToSend[1];
+    pc_to_hid.current_motor_c_mA = signalToSend[2];
 
     torqueSignals = cVector3d(signalToSend[0], signalToSend[1], signalToSend[2]);
 
-    unsigned char* msg_buf = reinterpret_cast<unsigned char*>(&msg);
+    unsigned char* msg_buf = reinterpret_cast<unsigned char*>(&pc_to_hid);
 
     //Fill the report
     out_buf[0] = 0;
-    for (int i = 1; i < 49; i++) {
+    for (int i = 1; i < 9; i++) {
         out_buf[i] = msg_buf[i-1];
     }
     int error = hid_write(handle,out_buf,sizeof(out_buf));
-    if(error!=49){
+    if(error!=9){
         std::cout << "hid_write return " << error << std::endl;
     }
 
-    usleep(2000);
+    //usleep(20);
 
 
     //std::cout << "Send Force! " << msg.command_force_x << std::endl;
@@ -1141,6 +1169,12 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
     // setTorqueToMyDevice(tx, ty, tz);
     // setForceToGripper(fg);
+
+#ifdef DELAY
+    using namespace std::chrono;
+    duration<int, std::micro> d{400};
+    std::this_thread::sleep_for(d);
+#endif
 
     // exit
     return (result);
