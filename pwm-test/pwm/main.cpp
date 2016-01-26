@@ -15,12 +15,13 @@ int main()
 
 
     uint data[2]= {1,0}; // DIO 0
+    S826_SafeWrenWrite(0,2);
     cout << "\nSet source: " << S826_DioOutputSourceWrite(0,data);
-
+    cout << "\nCounter Preload (register 0): " << S826_CounterPreloadWrite(0,0,0,900); // On time in us (.9ms)
+    cout << "\nCounter Preload (register 1): " << S826_CounterPreloadWrite(0,0,1,100); // Off time in us (.1ms)
     cout << "\nCounter Mode: " << S826_CounterModeWrite(0,0,0x01682020);
-    cout << "\nCounter State: " << S826_CounterStateWrite(0,0,1);
-    cout << "\nCounter Preload (register 0): " << S826_CounterPreloadWrite(0,0,0,9000000); // On time in us (9s)
-    cout << "\nCounter Preload (register 1): " << S826_CounterPreloadWrite(0,0,1,5000000); // Off time in us (5s)
+    cout << "\nForce load: " << S826_CounterPreload(0,0,0,0);
+    cout << "\nCounter State (run): " << S826_CounterStateWrite(0,0,1);
 
 
     while(true){

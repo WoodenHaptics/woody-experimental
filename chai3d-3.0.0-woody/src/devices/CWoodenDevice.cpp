@@ -67,6 +67,7 @@
 
 //#define USB  // define this to use the usb version
 //#define DELAY /// To test delay
+#define PWM
 
 // For delay testing
 #include <chrono>
@@ -475,14 +476,42 @@ bool cWoodenDevice::open()
 
     std::cout << "S826 boardflags: " << boardflags << std::endl;
 
-    // Initialize counters for channel 0,1,2
+    S826_SafeWrenWrite(0,2);
+
+    // Initialize counters for channel 3,4,5
     for(int i=0;i<3;++i){
-        S826_CounterFilterWrite(0,i,0);
-        S826_CounterModeWrite(0,i,0x70);
-        S826_CounterPreloadWrite(0,i,0,0); // Load 0
-        S826_CounterPreload(0,i,0,0);
+        S826_CounterFilterWrite(0,i+3,0);
+        S826_CounterModeWrite(0,i+3,0x70);
+        S826_CounterPreloadWrite(0,i+3,0,0); // Load 0
+        S826_CounterPreload(0,i+3,0,0);
+        S826_CounterStateWrite(0,i+3,1);
+
+#ifdef PWM
+
+        uint data2[2]= {7,0}; // DIO 0,1,2
+        S826_DioOutputSourceWrite(0,data2);
+
+/*
+        S826_CounterPreloadWrite(0,i,0,500);//period*pwm_percent);     // On time in us
+        S826_CounterPreloadWrite(0,i,1,500);//period*(1-pwm_percent)); // Off time in us
+        S826_CounterModeWrite(0,i,0x01682020); //+131072 (invert)
+        S826_CounterStateWrite(0,i,1);
+        S826_CounterPreloadWrite(0,i,0,500);//period*pwm_percent);     // On time in us
+        S826_CounterPreloadWrite(0,i,1,500);//period*(1-pwm_percent)); // Off time in us
+        S826_CounterModeWrite(0,i,0x01682020); //+131072 (invert)
         S826_CounterStateWrite(0,i,1);
 
+        */
+
+
+        using namespace std;
+        cout << "\nCounter Preload (register 0): " << S826_CounterPreloadWrite(0,i,0,50); // On time in us (.1ms)
+        cout << "\nCounter Preload (register 1): " << S826_CounterPreloadWrite(0,i,1,450); // Off time in us (.9ms)
+        cout << "\nCounter Mode: " << S826_CounterModeWrite(0,i,0x01682020);
+        S826_CounterPreload(0,i,0,0);
+        cout << "\nCounter State: " << S826_CounterStateWrite(0,i,1);
+
+#else
         // And range of analoge signal to escon
         S826_DacRangeWrite(0,i,3,0); //-10 to 10 V
 
@@ -491,6 +520,15 @@ bool cWoodenDevice::open()
         // analgoue and encoder breakout board of the S826.
         //
         S826_DacDataWrite(0,4+i,0xFFFF,0); // Channel 4,5,6 = Pin 41,43,45
+#endif
+
+#ifdef PWM
+    uint data[2];
+    data[0] = 8; // DIO3 (bit 4 set = 8)
+    data[1] = 0;
+    S826_DioOutputWrite(0,data,1); // Clear DIO3 = pin 41 is set HIGH
+#endif
+
     }
 
     std::cout << "Opened SENSORAY Board" << std::endl;
@@ -572,12 +610,26 @@ bool cWoodenDevice::close()
     bool result = C_SUCCESS; // if the operation fails, set value to C_ERROR.
 
     // *** INSERT YOUR CODE HERE ***
+
+    std::cout << "\nClosing\n";
     // Disable power
+#ifdef PWM
+    uint data[2];
+    data[0] = 8; // Bit 3 set = 4
+    data[1] = 0;
+    S826_DioOutputWrite(0,data,2); // SET DIO3 = pin 41 is set LOW
+
+    S826_CounterStateWrite(0,0,0);
+    S826_CounterStateWrite(0,1,0);
+    S826_CounterStateWrite(0,2,0);
+#else
 #ifndef USB
     S826_DacDataWrite(0,4,0x0,0); // Channel 4 = Pin 41
     S826_DacDataWrite(0,5,0x0,0); // Channel 5 = Pin 43
     S826_DacDataWrite(0,6,0x0,0); // Channel 6 = Pin 45
 #endif
+#endif
+
 
     //close HID device
     hid_close(handle);
@@ -674,22 +726,56 @@ double getMotorAngle(int motor, double cpr) {
     const unsigned int maxdata = 0xFFFFFFFF; // 32 bit
 
     uint encoderValue;
-    S826_CounterSnapshot(0,motor);
+    S826_CounterSnapshot(0,motor+3);
     uint ctstamp;
     uint reason;
-    S826_CounterSnapshotRead(0,motor,&encoderValue,&ctstamp,&reason,0);
+    S826_CounterSnapshotRead(0,motor+3,&encoderValue,&ctstamp,&reason,0);
+
+
+    //uint encoderValue2;
+    //S826_CounterSnapshot(0,0);
+    //S826_CounterSnapshotRead(0,0,&encoderValue2,&ctstamp,&reason,0);
+    //std::cout << encoderValue2 << std::endl;
+
+
 
     if(encoderValue >= maxdata/2)
         return -1.0*2.0*pi*(maxdata-encoderValue)/cpr;
     return 2.0*pi*encoderValue/cpr;
+
+
+
 }
 
 void setVolt(double v, int motor){
     if(v > 10 || v< -10) { printf("Volt outside +/- 10 Volt\n"); return; }
 
+    if(v > 6.6 || v< -6.6) { printf("Volt outside +/- 6.6 Volt = 2 Ampere (soft cap)\n"); return; }
+
+#ifdef PWM
+    // "-10V to +10V" is mapped to -3 to 3 Amp
+    // 0 Amp = 10% PWM, 3 Amp (or "10V") is 90%
+    // Direction is set separately.
+    double pwm_percent = (cSign(v)*v/10.0)*0.8 + 0.1; // (|v| / vMax) * 80% + 10%
+    double period = 250; //us
+
+    //std::cout << "Motor " << motor << " PWM percent " << pwm_percent << std::endl;
+
+    S826_CounterPreloadWrite(0,motor,0,period*(1-pwm_percent));     // On time in us
+    S826_CounterPreloadWrite(0,motor,1,period*pwm_percent);         // Off time in us
+
+    uint direction = cSign(v) > 0 ? 1 : 2;
+    int dir_chan[3] = {16,32,64}; // DIO4, DIO5, DIO6
+    uint data[2];
+    data[0] = dir_chan[motor];
+    data[1] = 0;
+    S826_DioOutputWrite(0,data,direction);
+
+#else
     // -10V to +10V is mapped from 0x0000 to 0xFFFF
     unsigned int signal = (v+10.0)/20.0 * 0xFFFF;
     S826_DacDataWrite(0,motor,signal,0);
+#endif
 }
 
 struct pose {
