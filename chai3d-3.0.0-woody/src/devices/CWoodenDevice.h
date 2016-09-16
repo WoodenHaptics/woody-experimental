@@ -49,6 +49,9 @@
 //------------------------------------------------------------------------------
 #include "devices/CGenericHapticDevice.h"
 #include "hidapi.h"
+#include <chrono>
+#include <thread>
+#include <vector>
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -293,7 +296,18 @@ protected:
     hid_to_pc_message hid_to_pc;
     pc_to_hid_message pc_to_hid;
 
+    std::chrono::steady_clock::time_point start;
+    std::chrono::steady_clock::time_point start_of_app;
 
+    // Log
+    std::vector<cVector3d> forces;
+    std::vector<cVector3d> positions;
+    std::vector<double> timestamp;
+
+    int global_dir_sum;
+    double global_pwm_percent[3];
+    void set_dir();
+    std::thread t;
 
     int res;
     unsigned char buf[9];// 1 extra byte for the report ID

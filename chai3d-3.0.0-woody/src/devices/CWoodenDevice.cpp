@@ -67,7 +67,8 @@
 
 //#define USB  // define this to use the usb version
 //#define DELAY /// To test delay
-#define PWM
+//#define PWM
+//#define SAVE_LOG
 
 // For delay testing
 #include <chrono>
@@ -276,6 +277,9 @@ cWoodenDevice::cWoodenDevice(unsigned int a_deviceNumber):
     m_deviceReady = false;
     lost_messages = 0;
 
+    for(int i=0;i<3;++i)
+        global_pwm_percent[i]=0.1;
+
 
     ////////////////////////////////////////////////////////////////////////////
     /*
@@ -416,6 +420,7 @@ cWoodenDevice::cWoodenDevice(unsigned int a_deviceNumber):
 
     // *** INSERT YOUR CODE HERE ***
     m_deviceAvailable = true; // this value should become 'true' when the device is available.
+    start_of_app = std::chrono::steady_clock::now();
 }
 
 
@@ -472,6 +477,7 @@ bool cWoodenDevice::open()
     // *** INSERT YOUR CODE HERE ***
 
 #ifndef USB
+    //t = std::thread(&cWoodenDevice::set_dir,this);
     int boardflags  = S826_SystemOpen();
 
     std::cout << "S826 boardflags: " << boardflags << std::endl;
@@ -488,6 +494,7 @@ bool cWoodenDevice::open()
 
 #ifdef PWM
 
+        // THIS ROUTES pwm FROM COUNTER TO DIO 0,1,2
         uint data2[2]= {7,0}; // DIO 0,1,2
         S826_DioOutputSourceWrite(0,data2);
 
@@ -505,9 +512,9 @@ bool cWoodenDevice::open()
 
 
         using namespace std;
-        cout << "\nCounter Preload (register 0): " << S826_CounterPreloadWrite(0,i,0,50); // On time in us (.1ms)
-        cout << "\nCounter Preload (register 1): " << S826_CounterPreloadWrite(0,i,1,450); // Off time in us (.9ms)
-        cout << "\nCounter Mode: " << S826_CounterModeWrite(0,i,0x01682020);
+        cout << "\nCounter Preload (register 0): " << S826_CounterPreloadWrite(0,i,0,50000); // On time in us (.1ms)
+        cout << "\nCounter Preload (register 1): " << S826_CounterPreloadWrite(0,i,1,50000); // Off time in us (.9ms)
+        cout << "\nCounter Mode: " << S826_CounterModeWrite(0,i,0x01682020+16); //+16 for 50Mhz clock instead of 1Mhz
         S826_CounterPreload(0,i,0,0);
         cout << "\nCounter State: " << S826_CounterStateWrite(0,i,1);
 
@@ -606,6 +613,34 @@ bool cWoodenDevice::close()
         If the connection succeeds, set the variable 'result' to C_SUCCESS.
     */
     ////////////////////////////////////////////////////////////////////////////
+
+    // Save log
+#ifdef SAVE_LOG
+    using namespace std;
+
+    ofstream myfile;
+    myfile.open ("log.m");
+    int lines = timestamp.size() < forces.size() ? timestamp.size() : forces.size();
+    lines = positions.size() < lines ? positions.size() : lines;
+    string channel[] = {"force_x=[","force_y=[","force_z=[","timestamp=[","pos_x=[","pos_y=[","pos_z=["};
+    for(int c=0;c<7;++c){
+        myfile << channel[c];
+        for(int i=0;i<lines;++i){
+            if(c==0) myfile << forces[i].x();
+            if(c==1) myfile << forces[i].y();
+            if(c==2) myfile << forces[i].z();
+            if(c==3) myfile << timestamp[i]*0.000001;
+            if(c==4) myfile << positions[i].x()*1000;
+            if(c==5) myfile << positions[i].y()*1000;
+            if(c==6) myfile << positions[i].z()*1000;
+            myfile << " ";
+        }
+        myfile << "];\n";
+    }
+    myfile.close();
+#endif
+
+
 
     bool result = C_SUCCESS; // if the operation fails, set value to C_ERROR.
 
@@ -737,8 +772,6 @@ double getMotorAngle(int motor, double cpr) {
     //S826_CounterSnapshotRead(0,0,&encoderValue2,&ctstamp,&reason,0);
     //std::cout << encoderValue2 << std::endl;
 
-
-
     if(encoderValue >= maxdata/2)
         return -1.0*2.0*pi*(maxdata-encoderValue)/cpr;
     return 2.0*pi*encoderValue/cpr;
@@ -750,32 +783,14 @@ double getMotorAngle(int motor, double cpr) {
 void setVolt(double v, int motor){
     if(v > 10 || v< -10) { printf("Volt outside +/- 10 Volt\n"); return; }
 
-    if(v > 6.6 || v< -6.6) { printf("Volt outside +/- 6.6 Volt = 2 Ampere (soft cap)\n"); return; }
+//    if(motor == 0){
+//        std::cout << "Volt " << v << std::endl;
+//    }
 
-#ifdef PWM
-    // "-10V to +10V" is mapped to -3 to 3 Amp
-    // 0 Amp = 10% PWM, 3 Amp (or "10V") is 90%
-    // Direction is set separately.
-    double pwm_percent = (cSign(v)*v/10.0)*0.8 + 0.1; // (|v| / vMax) * 80% + 10%
-    double period = 250; //us
-
-    //std::cout << "Motor " << motor << " PWM percent " << pwm_percent << std::endl;
-
-    S826_CounterPreloadWrite(0,motor,0,period*(1-pwm_percent));     // On time in us
-    S826_CounterPreloadWrite(0,motor,1,period*pwm_percent);         // Off time in us
-
-    uint direction = cSign(v) > 0 ? 1 : 2;
-    int dir_chan[3] = {16,32,64}; // DIO4, DIO5, DIO6
-    uint data[2];
-    data[0] = dir_chan[motor];
-    data[1] = 0;
-    S826_DioOutputWrite(0,data,direction);
-
-#else
+    //if(v > 6.6 || v< -6.6) { printf("Volt outside +/- 6.6 Volt = 2 Ampere (soft cap)\n"); return; }
     // -10V to +10V is mapped from 0x0000 to 0xFFFF
     unsigned int signal = (v+10.0)/20.0 * 0xFFFF;
     S826_DacDataWrite(0,motor,signal,0);
-#endif
 }
 
 struct pose {
@@ -791,9 +806,9 @@ pose calculate_pose(const cWoodenDevice::configuration& c, double* encoder_value
     pose p;
 
     double cpr[] = { c.cpr_encoder_a, c.cpr_encoder_b, c.cpr_encoder_c };
-    double gearRatio[] = { -c.diameter_body_a / c.diameter_capstan_a,
-		           -c.diameter_body_b / c.diameter_capstan_b,
-		            c.diameter_body_c / c.diameter_capstan_c };
+    double gearRatio[] = { c.diameter_body_a / c.diameter_capstan_a,
+                   -c.diameter_body_b / c.diameter_capstan_b,
+                    c.diameter_body_c / c.diameter_capstan_c };
 
     double dofAngle[3];
 #ifdef USB
@@ -801,7 +816,7 @@ pose calculate_pose(const cWoodenDevice::configuration& c, double* encoder_value
         dofAngle[i] = (2.0*pi*encoder_values[i]/cpr[i]) / gearRatio[i];
 #else
     for(int i=0;i<3;i++)
-        dofAngle[i] = getMotorAngle(i,cpr[i]) / gearRatio[i];
+        dofAngle[i] = -getMotorAngle(i,cpr[i]) / gearRatio[i];
 #endif
 
     // Calculate dof angles (theta) for each body
@@ -810,12 +825,15 @@ pose calculate_pose(const cWoodenDevice::configuration& c, double* encoder_value
     p.Lc = c.length_body_c; 
     p.tA = dofAngle[0];
     p.tB = dofAngle[1];
-    p.tC = dofAngle[2] - dofAngle[1];
+    //p.tC = dofAngle[2] - dofAngle[1];
+    p.tC = dofAngle[2]; // 2016-05-30
 
     return p;
 }
 
-
+double deg(double rad){
+    return 360*rad/(2*3.141592);
+}
 
 //==============================================================================
 /*!
@@ -855,13 +873,32 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
     const double& Lb = p.Lb; 
     const double& Lc = p.Lc; 
     const double& tA = p.tA; 
-    const double& tB = p.tB; 
-    const double& tC = p.tC; 
+    double tB = p.tB;
+    double tC = p.tC;
 
     // Do forward kinematics (thetas -> xyz)
     x = cos(tA)*(Lb*sin(tB)+Lc*cos(tB+tC))     - m_config.workspace_origin_x;
     y = sin(tA)*(Lb*sin(tB)+Lc*cos(tB+tC))     - m_config.workspace_origin_y;
     z = Ln + Lb*cos(tB) - Lc*sin(tB+tC)        - m_config.workspace_origin_z;
+
+
+    // Mike kinematics 2016-05-30
+    //std::cout << "Raw tA, tB, tC: " << deg(tA) << " " << deg(tB) << " " << deg(tC);
+
+    // we have to remove the false contribution from tB
+    //tC = tC+tB;
+
+    // according to figure is our usual "starting position" at 90' theta c
+    //tC = -tC+3.141592/2;
+    //tC = tC+3.141592/2;
+    tB = tB + 3.141592/2;
+
+    //std::cout << " Modified tA, tB, tC: "<< deg(tA) << " " << deg(tB) << " " << deg(tC) << std::endl;
+
+    x = cos(tA)*(Lb*sin(tB)+Lc*sin(tC))    - m_config.workspace_origin_x;
+    y = sin(tA)*(Lb*sin(tB)+Lc*sin(tC)) - m_config.workspace_origin_y;
+    z = Ln+Lb*cos(tB)-Lc*cos(tC) - m_config.workspace_origin_z;
+
 #endif
 
 #ifdef USB
@@ -988,6 +1025,10 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
     // store new position values
     a_position.set(x, y, z);
 
+#ifdef SAVE_LOG
+    positions.push_back(a_position);
+#endif
+
     // estimate linear velocity
     estimateLinearVelocity(a_position);
 
@@ -1087,9 +1128,79 @@ bool cWoodenDevice::getGripperAngleRad(double& a_angle)
     // estimate gripper velocity
     estimateGripperVelocity(a_angle);
 
-    // exit
+    // exitelseifdef
     return (result);
 }
+
+
+void cWoodenDevice::set_dir(){
+    double period = 1000*50; //us (*50 for 50Mhz clock)
+    using namespace std::chrono;
+    duration<int, std::micro> d{1};
+
+    int my_dir_sum = 0;
+
+
+    double next_percentages[3] = {0.1,0.1,0.1};
+    uint next_dir_sum = 0;
+    uint last_val;
+
+    while(true){
+        /*
+        for(int i=0;i<3;++i){
+            S826_CounterPreloadWrite(0,i,0,period*(1-global_pwm_percent[i]));     // On time in us
+            S826_CounterPreloadWrite(0,i,1,period*global_pwm_percent[i]);         // Off time in us
+        }
+        */
+
+
+        uint ctstamp;
+        uint reason;
+        uint counter;
+        S826_CounterSnapshot(0,0);
+        S826_CounterSnapshotRead(0,0,&counter,&ctstamp,&reason,0);
+
+        if(last_val<counter){
+            // means we have reloaded 1000
+            for(int i=0;i<3;++i){
+                next_percentages[i] = global_pwm_percent[i];
+                next_dir_sum = global_dir_sum;
+            }
+        }
+        last_val = counter;
+
+
+        uint pins[] = {1,2,4};
+        uint dio = 0; // (8 = dio4 = enable, but set it high = low = off)
+        //std::cout << counter << " ";
+        for(int i=0;i<3;++i){
+            if(counter<(1-next_percentages[i])*period)
+                dio += pins[i];
+        }
+        dio += next_dir_sum;
+
+
+        //if(global_dir_sum==my_dir_sum)
+        //    std::this_thread::sleep_for(d);
+
+        //my_dir_sum = global_dir_sum;
+
+
+        // All direction pins at once
+        uint data[2];
+        data[0] = dio;//global_dir_sum;
+        data[1] = 0;
+        S826_DioOutputWrite(0,data,0);
+
+        // Sleep one micro
+        duration<int, std::micro> dt{1};
+        std::this_thread::sleep_for(dt);
+
+
+        //std::this_thread::sleep_for(d);
+    }
+}
+
 
 
 //==============================================================================
@@ -1111,7 +1222,7 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     /*
         STEP 10:
         
-        Here you may implement code which sends a force (fx,fy,fz),
+        Here you may implement code which sends a force (fx,elseifdeffy,fz),
         torque (tx, ty, tz) and/or gripper force (gf) command to your haptic device.
 
         If your device does not support one of more of the force, torque and 
@@ -1129,6 +1240,21 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
         x-axis.
     */
     ////////////////////////////////////////////////////////////////////////////
+
+
+
+
+    //if(a_force.length()>0.0001){
+
+#ifdef SAVE_LOG
+        forces.push_back(a_force);
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        double duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start_of_app).count();
+        timestamp.push_back(duration_us);
+#endif
+    //}
+
+
 
     bool result = C_SUCCESS;
 
@@ -1152,10 +1278,26 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     const double& Lb = p.Lb; 
     const double& Lc = p.Lc; 
     const double& tA = p.tA; 
-    const double& tB = p.tB; 
-    const double& tC = p.tC; 
+    double tB = p.tB;
+    double tC = p.tC;
 
-    // Make Jacobian
+
+
+    // Starting position 90'
+    //tC = tC+3.141592/2;
+    tB = tB + 3.141592/2;
+
+    //std::cout << " Modified tA, tB, tC: "<< deg(tA) << " " << deg(tB) << " " << deg(tC) << std::endl;
+    //x = cos(tA)*(Lb*sin(tB)+Lc*sin(tC))    - m_config.workspace_origin_x;
+    //y = sin(tA)*(Lb*sin(tB)+Lc*sin(tC)) - m_config.workspace_origin_y;
+    //z = Ln+Lb*cos(tB)-Lc*cos(tC) - m_config.workspace_origin_z;
+
+
+
+
+
+    /*
+    // Make Jacobian 2015-style
     double jac123[4][4];
     jac123[1][1] = -sin(tA)*(Lb*sin(tB)+Lc*cos(tB+tC));
     jac123[1][2] =  cos(tA)*(Lb*cos(tB)); //-Lc*sin(tB+tC));
@@ -1172,7 +1314,17 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     J.set(jac123[1][1],jac123[1][2],jac123[1][3],
           jac123[2][1],jac123[2][2],jac123[2][3],
           jac123[3][1],jac123[3][2],jac123[3][3]);
+    */
+
+    // Make Jacobian 2016-05-30
+    cMatrix3d J;
+    J.set(  -sin(tA)*(Lb*sin(tB)+Lc*sin(tC)),    Lb*cos(tA)*cos(tB),   Lc*cos(tA)*cos(tC),
+             cos(tA)*(Lb*sin(tB)+Lc*sin(tC)),    Lb*sin(tA)*cos(tB),   Lc*sin(tA)*cos(tC),
+                        0,                           -Lb*sin(tB),           Lc*sin(tC)     );
+
+
     cVector3d f=a_force;
+    f += cVector3d(-0.2,0,0);
     cVector3d t=cTranspose(J)*f;
 
     // Gravity compensation
@@ -1181,16 +1333,22 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     const double& Lc_cm = m_config.length_cm_body_c;
     const double& mB = m_config.mass_body_b;
     const double& mC = m_config.mass_body_c;
-    double grav_comp[] { 0,
-                        -g*(Lb*mC*sin(tB)+Lb_cm*mB*sin(tB)+Lc_cm*mC*cos(tB+tC)),
-                        -g*(Lc_cm*mC*cos(tB+tC)) };
-    t = t + cVector3d(grav_comp[0],grav_comp[1],grav_comp[2]);
+    //double grav_comp[] { 0,
+    //                    -g*(Lb*mC*sin(tB)+Lb_cm*mB*sin(tB)+Lc_cm*mC*cos(tB+tC)),
+    //                    -g*(Lc_cm*mC*cos(tB+tC)) };
+    //t = t + cVector3d(grav_comp[0],grav_comp[1],grav_comp[2]);
+
+
+    t = t + -g*cVector3d( 0,
+                          mB*Lb_cm*sin(tB) + mC*(Lb_cm + Lc_cm)*sin(tC),
+                          mC*Lc_cm*sin(tC) );
+
 
     // Gear down 
     double motorTorque[] = {
             t.x() * m_config.diameter_capstan_a / m_config.diameter_body_a,
             t.y() * m_config.diameter_capstan_b / m_config.diameter_body_b,
-           -t.z() * m_config.diameter_capstan_c / m_config.diameter_body_c };
+            t.z() * m_config.diameter_capstan_c / m_config.diameter_body_c }; // switched sign 2016-05-30
 
     // Set motor torque (t)
     double torque_constant[] = { m_config.torque_constant_motor_a, 
@@ -1198,6 +1356,9 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
                                  m_config.torque_constant_motor_c };
 
     short signalToSend[3] = {0,0,0};
+    int dir[3];
+    int dir_chan[3] = {16,32,64}; // DIO4, DIO5, DIO6
+    int dir_sum=0;
 
     for(int i=0;i<3;++i){
         double motorAmpere = motorTorque[i] / torque_constant[i];
@@ -1205,21 +1366,56 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
         if(signal>10.0)  signal =  10.0;
         if(signal<-10.0) signal = -10.0;
 
+        dir[i] = cSign(signal) > 0 ? 1 : 2;
+        dir_sum += cSign(signal) < 0 ? dir_chan[i] : 0;
+
         //if(i==0) motorAmpere = 0.5;
 
 
 #ifdef USB
        signalToSend[i] = short(motorAmpere*1000);
-#else
+#endif
+
+#ifdef PWM
+        // "-10V to +10V" is mapped to -3 to 3 Amp
+        // 0 Amp = 10% PWM, 3 Amp (or "10V") is 90%
+        // Direction is set separately.
+        double pwm_percent = (cSign(signal)*signal/10.0)*0.8 + 0.1; // (|v| / vMax) * 80% + 10%
+        double period = 200*50; //us (*50 for 50Mhz clock)
+
+        //std::cout << "Motor " << motor << " PWM percent " << pwm_percent << std::endl;
+        S826_CounterPreloadWrite(0,i,0,period*(1-pwm_percent));     // On time in us
+        S826_CounterPreloadWrite(0,i,1,period*pwm_percent);         // Off time in us
+
+        global_pwm_percent[i] = pwm_percent;
+#endif
+
+#ifndef USB
+        // One at a time
+        uint direction = cSign(v) > 0 ? 1 : 2;
+
+        uint data[2];
+        data[0] = dir_chan[i];
+        data[1] = 0;
+        S826_DioOutputWrite(0,data,direction);
+
+        //global_dir_sum = dir_sum;
+
+        //using namespace std::chrono;
+        //duration<int, std::micro> d{500};
+        //std::this_thread::sleep_for(d);
+
         setVolt(signal,i);
+        //setVolt(2.0,i);
 #endif
     }
+
+
 
 #ifdef USB    
     //signalToSend[0] = 0;
     //signalToSend[1] = 0;
     //signalToSend[2] = 0;
-
 
     unsigned char out_buf[9];
 
@@ -1261,6 +1457,20 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     duration<int, std::micro> d{400};
     std::this_thread::sleep_for(d);
 #endif
+
+    /*
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    double duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    if(duration_us < 0 || duration_us>1000000){}
+    else if(duration_us<900){
+        using namespace std::chrono;
+        int sleep_for = 900-duration_us;
+        //std::cout << "duration " << duration_us << " sleep for" << sleep_for << std::endl;
+        duration<int, std::micro> d{sleep_for};
+        std::this_thread::sleep_for(d);
+    }
+    start = std::chrono::steady_clock::now();
+    */
 
     // exit
     return (result);
