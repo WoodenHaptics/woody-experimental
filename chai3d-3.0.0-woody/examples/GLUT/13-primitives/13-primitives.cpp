@@ -97,10 +97,14 @@ cGenericHapticDevicePtr hapticDevice;
 
 cLabel* labelHapticDeviceTorqueSignal;
 cVector3d hapticDeviceTorqueSignal;
-
+cVector3d lastForce;
 
 // a virtual tool representing the haptic device in the scene
 cToolCursor* tool;
+
+// a scope to monitor position values of haptic device
+cScope* scope;
+
 
 // a label to display the rate [Hz] at which the simulation is running
 cLabel* labelHapticRate;
@@ -261,6 +265,7 @@ int main(int argc, char* argv[])
     // attach light to camera
     camera->addChild(light);    
 
+
     // enable light source
     light->setEnabled(true);                   
 
@@ -279,6 +284,14 @@ int main(int argc, char* argv[])
 
     // set light cone half angle
     light->setCutOffAngleDeg(30);
+
+    scope = new cScope();
+    camera->m_frontLayer->addChild(scope);
+    scope->setSize(600, 280);
+    scope->setLocalPos(100,60);
+    scope->setRange(-100, 100);
+    scope->setSignalEnabled(true, true, true, false);
+    scope->setTransparencyLevel(0.7);
 
 
     //--------------------------------------------------------------------------
@@ -504,6 +517,10 @@ void resizeWindow(int w, int h)
 {
     windowW = w;
     windowH = h;
+
+    // update position of scope
+    scope->setSize(windowW - 200, 480);
+
 }
 
 //------------------------------------------------------------------------------
@@ -588,6 +605,12 @@ void updateGraphics(void)
     // update position of label
     labelHapticRate->setLocalPos((int)(0.5 * (windowW - labelHapticRate->getWidth())), 15);
 
+
+
+    // update information to scope
+    scope->setSignalValues(lastForce.x(),
+                           lastForce.y(),
+                           lastForce.z());
 
     /////////////////////////////////////////////////////////////////////
     // RENDER SCENE
@@ -723,6 +746,7 @@ void updateHaptics(void)
 
         // send forces to haptic device
         tool->applyForces();  
+        lastForce = tool->m_lastComputedGlobalForce;
 
         if(cWoodenDevice* w = dynamic_cast<cWoodenDevice*>(hapticDevice.get())){
             hapticDeviceTorqueSignal = w->getTorqueSignals();

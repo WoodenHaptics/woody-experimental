@@ -689,9 +689,12 @@ void updateHaptics(void)
             gripperForce = gripperForce - Kvg * gripperAngularVelocity;
         }
 
+        //force = cVector3d(6,0,0);
+
 
         // send computed force, torque, and gripper force to haptic device	
-        hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);        
+        hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+
 
         hapticDeviceForce = force;
         if(cWoodenDevice* w = dynamic_cast<cWoodenDevice*>(hapticDevice.get())){
