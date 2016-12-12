@@ -1,0 +1,338 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+        <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+		<title>WoodenHaptics simulator</title>
+		<!--style>
+		p.case { clear: both; border-top: 1px solid #888; }
+		</style-->
+        <link rel="stylesheet" type="text/css" href="x3dom.css" />
+	</head>
+       
+<body>
+
+    <h1>WoodenHaptics Simulator</h1>
+	
+	<table><tr><td>
+	<p style="text-align:right"> 
+		<X3D xmlns="http://www.web3d.org/specifications/x3d-namespace"  showStat="false" showLog="false" x="0px" y="0px" width="400px" height="400px" altImg="helloX3D-alt.png">
+          <Scene>
+            <!--Viewpoint id="vp" position='0.60 0.20 0' orientation="0 1 0 1.5707" fieldOfView="45"/-->
+            <Viewpoint id="vp" position='0.15 -0.6 0.2' orientation="1 0 0 1.57" fieldOfView="45"/>
+			
+			<Transform id="NoTq">
+				<Shape>
+					<Sphere radius="0.025"/>
+					<Appearance><Material diffuseColor="1 0 0"/></Appearance>
+				</Shape>				
+			</Transform>
+			
+			<Transform id="A">
+			
+				<Transform id="aTb" translation="0 0 0.08">
+				
+					<Transform id="B">
+					
+					    <Transform id="bTc" translation="0 0 0.21">					
+						
+							<Transform id="C">
+							
+								<Transform id="cTq" translation="0.24 0 0">
+									<Shape>
+										<Sphere radius="0.02"/>
+										<Appearance><Material diffuseColor="0 0 0"/></Appearance>
+									</Shape>
+								</Transform>
+							
+							
+								<Transform id="tboxc" translation="0.12 0 0">
+									<Shape>
+										<Box id="boxc" size="0.24 0.03 0.04"/>
+										<Appearance DEF="cmat">
+											<Material diffuseColor="0.5 0.5 1.0"/>
+										</Appearance>
+									</Shape>
+								</Transform>
+								
+							</Transform>
+
+						</Transform>
+						
+						
+
+						<Transform rotation="0 0 1 0">
+							<Shape>
+								<Cylinder radius="0.06" height="0.03"/>
+								<Appearance DEF="bmat">
+									<Material diffuseColor="0.5 0.8 0.5"/>
+								</Appearance>						
+							</Shape>
+						</Transform>
+						
+						<Transform id="tboxb" translation="0 0 0.105">
+							<Shape>
+								<Box id="boxb" size="0.04 0.03 0.21"/>
+								<Appearance USE="bmat"/>
+							</Shape>
+						</Transform>
+					</Transform>
+				</Transform>
+				
+				<Transform rotation="1 0 0 1.54">				
+					<Shape>
+						<Cylinder radius="0.08" height="0.03"/>
+						<Appearance DEF="amat">
+							<Material diffuseColor="1 0.5 0.5"/>
+						</Appearance>
+					</Shape>
+				</Transform>
+				
+				<Group DEF="holder">
+					<Transform translation="0 0.03 0.02">			
+						<Shape>
+							<Box size="0.10 0.02 0.05"/>
+							<Appearance USE="amat"/>
+						</Shape>								
+					</Transform>
+					<Transform rotation="1 0 0 0" translation="0 0.03 0.05">				
+						<Shape>
+							<Cylinder radius="0.05" height="0.02"/>
+							<Appearance USE="amat"/>
+						</Shape>
+					</Transform>
+				</Group>
+				<Transform translation="0 -0.06 0">
+				   <Group USE="holder"/>
+				</Transform>
+			</Transform>
+			
+			<Transform id="root"/>
+			
+			
+          </Scene>
+        </X3D>
+	</p>
+	
+	<script type="text/javascript"><![CDATA[
+	
+	var count=0;
+	
+	function changeSize(){
+		var L_a = 0.08;
+		var L_b = document.getElementById("blength").value * 0.01;
+		var L_c = document.getElementById("clength").value * 0.01;
+		var theta_a = document.getElementById("adeg").value *2*3.141592 / 360.0;
+		var theta_b = document.getElementById("bdeg").value *2*3.141592 / 360.0;
+		var theta_c = document.getElementById("cdeg").value *2*3.141592 / 360.0;
+
+		draw(L_a, L_b, L_c, theta_a, theta_b, theta_c);
+		
+		
+		// Calculate position
+		var Px = Math.cos(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
+		var Py = Math.sin(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
+		var Pz = L_a + L_b*Math.cos(theta_b)-L_c*Math.sin(theta_b+theta_c);
+		
+		// Calculate max force in y direction in this position
+		var maxcurrent = parseFloat(document.getElementById("maxcurrent").value);
+		var torquek = parseFloat(document.getElementById("torqueconstant").value);
+		var gearRatioAboutZ = 16;
+		var FmaxY = (gearRatioAboutZ * maxcurrent * torquek * 0.001) / Px;
+		
+		document.getElementById("tjo").innerHTML = "Current manipulandum position in frame N from N's origin: P<sub>x,y,z</sub> = ["+
+		         (1000*Px).toFixed(0).toString() + " " + (1000*Py).toFixed(0).toString() + " " + (1000*Pz).toFixed(0).toString() + "]<sup>T</sup> mm"
+				 + "<br/>Max force in y direction at current position: <b>" + FmaxY.toFixed(3).toString() + "</b> N <br/>";
+		
+		
+		
+
+				
+		return false;		
+	}
+	
+	function draw(L_a, L_b, L_c, theta_a, theta_b, theta_c){
+		document.getElementById("boxb").setAttribute("size", "0.04 0.03 " + L_b.toString());
+		document.getElementById("tboxb").setAttribute("translation", "0 0 " + (L_b/2).toString());
+		document.getElementById("bTc").setAttribute("translation", "0 0 " + L_b.toString());
+		
+		document.getElementById("boxc").setAttribute("size", L_c.toString() + " 0.031 0.04");
+		document.getElementById("tboxc").setAttribute("translation", (L_c/2).toString()+ " 0 0");
+		document.getElementById("cTq").setAttribute("translation", L_c.toString() + " 0 0");
+
+		document.getElementById("A").setAttribute("rotation","0 0 1 " + theta_a.toString());		
+		document.getElementById("B").setAttribute("rotation","0 1 0 " + theta_b.toString());		
+		document.getElementById("C").setAttribute("rotation","0 1 0 " + theta_c.toString());
+		
+		// Calculate position
+		var Px = Math.cos(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
+		var Py = Math.sin(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
+		var Pz = L_a + L_b*Math.cos(theta_b)-L_c*Math.sin(theta_b+theta_c);
+		
+		document.getElementById("NoTq").setAttribute("translation",Px.toString()+" "+Py.toString() + " " + Pz.toString());		
+	}
+	
+	var minMaxY=1000.0;
+	var whereMin = "";
+	
+	function moveAbout(){
+		var L_a = 0.08;
+		var L_b = document.getElementById("blength").value * 0.01;
+		var L_c = document.getElementById("clength").value * 0.01;
+		var theta_a = 0;
+		var theta_b = 0;
+		var theta_c = 0;
+		
+		var d = 2*3.141592/360.0;
+		var s = stepCount;
+		var skip=15;
+		
+		theta_a = (s%(180/skip)-90/skip)*d*skip;
+		theta_b = ((s/(180/skip)|0)%(90/skip))*d*skip;
+		theta_c = ((s/(180/skip*90/skip)|0)%(90/skip)-45/skip)*d*skip;
+		
+		//18*9*9
+		
+		
+		
+		//if(stepCount < 180){
+		/*
+		theta_a = ((ds*skip)%180-90)*d;
+		theta_b = (((skip*skip*ds)/180)%90)*d; 
+		theta_c = (((skip*skip*skip*ds)/(180*90))%140-70)*d;//((ds/(180*90))%140-70)*d;
+		*/
+
+		
+		draw(L_a, L_b, L_c, theta_a, theta_b, theta_c);
+		
+		//} 
+		
+		
+		var Px = Math.cos(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
+		var Py = Math.sin(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
+		var Pz = L_a + L_b*Math.cos(theta_b)-L_c*Math.sin(theta_b+theta_c);		
+		addSphere(Px,Py,Pz);
+
+		
+		theta_a /=d;
+		theta_b /=d;
+		theta_c /=d;
+		
+		
+		var maxcurrent = parseFloat(document.getElementById("maxcurrent").value);
+		var torquek = parseFloat(document.getElementById("torqueconstant").value);
+		var gearRatioAboutZ = 16;
+		var FmaxY = (gearRatioAboutZ * maxcurrent * torquek * 0.001) / Px;
+		if(FmaxY<minMaxY) {
+			minMaxY = FmaxY;
+			whereMin = "Minimum max force: " + FmaxY.toFixed(3).toString() + " N found at postion P=["+
+		         (1000*Px).toFixed(0).toString() + " " + (1000*Py).toFixed(0).toString() + " " + (1000*Pz).toFixed(0).toString() + "]<sup>T</sup> mm";
+		}
+		
+		
+		document.getElementById("degs").innerHTML="Theta " + theta_a.toFixed(2).toString() + " " + theta_b.toFixed(2).toString() + " " + theta_c.toFixed(2).toString()
+		+ "<br/> "+ whereMin;
+		
+	}
+	
+	function addSphere(x,y,z){
+        var t = document.createElement('Transform');
+        t.setAttribute("translation", x.toString() + " " + y.toString() + " " + z.toString() );
+        var s = document.createElement('Shape');
+		
+		// Appearance Node
+		var app = document.createElement('Appearance');
+		app.setAttribute("USE","amat");
+		
+		/*
+		// Material Node
+		var mat = document.createElement('Material');
+		
+		app.appendChild(mat);
+		*/
+		
+		s.appendChild(app);
+		
+        t.appendChild(s);
+        var b = document.createElement('Box');
+        s.appendChild(b);
+		b.setAttribute("size","0.003 0.003 0.003");
+        
+        var ot = document.getElementById('root');
+        ot.appendChild(t);	
+	}
+	
+	var stepCount=0;
+	
+	function animate() {
+		step();
+		changeSize();
+	}
+	
+	function step() {
+		stepCount++;
+		moveAbout();
+		document.getElementById("otext").innerHTML="Timeframe: " + stepCount.toString();
+		if(stepCount < 180*90*90/(15*15*15))
+			setTimeout(step,1000/60); // 60 fps
+	}
+	
+	function init(){
+
+	
+	    changeSize();
+		
+	}
+	
+	
+	window.onload = init;
+	
+	]]></script>
+	
+	</td><td valign="top">
+	<p class="case">
+	<!--input type="button" id="color" value="Change Color" onclick="toggleRendering();" /-->
+	
+	<!--
+	Requirements<br/>
+	Maximum force:  1 N <input type="range" id="maxforce" min="1" max="100" onchange=""/>100 N<br/>
+<br/><br/>
+-->
+	
+	<b>Design parameters:</b><br/><br/>
+	Max motor current   <input type="text" id="maxcurrent" value="3.17" size="5" onchange="changeSize();"/> A (Maxon RE40 no. 148877 has 3.17 A continious) <br/> 
+	Motor torque/ampere <input type="text" id="torqueconstant" value="60.3" size="5"  onchange="changeSize();"/> mNm/A (Maxon RE40: 60.3mNm/A) <br/> 
+	<br/>
+	
+	
+    L<sub>b</sub>&nbsp;&nbsp;&nbsp; 5 cm <input type="range" id="blength" min="5" max="35" onchange="changeSize();"/>35 cm<br/>
+    L<sub>c</sub>&nbsp;&nbsp;&nbsp; 5 cm <input type="range" id="clength" min="5" max="35" onchange="changeSize();"/>35 cm<br/>
+	<br/><br/>
+	Run-time parameters:<br/>
+	&theta;<sub>a</sub>&nbsp;&nbsp;&nbsp; -90&deg; <input type="range" id="adeg"  name="clength" min="-90" max="90" onchange="changeSize();"/> +90&deg;<br/>
+	&theta;<sub>b</sub>&nbsp;&nbsp;&nbsp; -90&deg; <input type="range" id="bdeg"  name="clength" min="-90" max="90" onchange="changeSize();"/> +90&deg;<br/>
+	&theta;<sub>c</sub>&nbsp;&nbsp;&nbsp; -90&deg; <input type="range" id="cdeg"  name="clength" min="-90" max="90" onchange="changeSize();"/> +90&deg;<br/>
+	
+
+	<p id="tjo"/>
+	<p id="degs"/>
+	<p id="otext"/>
+	<!--form>
+	Hej
+    <input type="number" name="amountInput" min="0" max="20" value="0" oninput="this.form.amountRange.value=this.value" />
+    <input type="range" name="amountRange" min="0" max="20" value="0" oninput="this.form.amountInput.value=this.value" />
+    </form-->
+	
+	<br/>
+	<input type="submit" value="animate" onclick="animate();"/>
+	</p>
+	<br/>
+	
+	</td></tr></table>
+	<script type="text/javascript" src="x3dom.js"></script>
+   
+
+</body>
+</html>
