@@ -65,7 +65,7 @@
 
 
 
-//#define USB  // define this to use the usb version
+#define USB  // define this to use the usb version
 //#define DELAY /// To test delay
 //#define PWM
 //#define SAVE_LOG
@@ -978,25 +978,48 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
 //    double encoder_values[] = { incoming_msg.temperature_0,
 //                                incoming_msg.temperature_1,
 //                                incoming_msg.temperature_2 };
-    double encoder_values[] = { hid_to_pc.encoder_a,
+    //double encoder_values[] = { 0,                             0, 0 };
+    double encoder_values[] = { -hid_to_pc.encoder_a,
                                 hid_to_pc.encoder_b,
                                 hid_to_pc.encoder_c };
+
+    //std::cout << "a: " << hid_to_pc.encoder_a << " b:" << hid_to_pc.encoder_b << " c:"<< hid_to_pc.encoder_c << "\n";
+
+    using namespace std;
+    //cout << encoder_values[0] << ", " << encoder_values[1] << ", " << encoder_values[2] << endl;
     pose p  = calculate_pose(m_config, encoder_values);
     const double& Ln = p.Ln;
     const double& Lb = p.Lb;
     const double& Lc = p.Lc;
     const double& tA = p.tA;
-    const double& tB = p.tB;
-    const double& tC = p.tC;
+    double tB = p.tB;
+    double tC = p.tC;
 
     // Do forward kinematics (thetas -> xyz)
+    /*
     x = cos(tA)*(Lb*sin(tB)+Lc*cos(tB+tC))     - m_config.workspace_origin_x;
     y = sin(tA)*(Lb*sin(tB)+Lc*cos(tB+tC))     - m_config.workspace_origin_y;
     z = Ln + Lb*cos(tB) - Lc*sin(tB+tC)        - m_config.workspace_origin_z;
+    */
+
+
+    // Mike edition
+    tC = -tC + 3.141592/2;
+    x = cos(tA)*(Lb*sin(tB)+Lc*sin(tC))    - m_config.workspace_origin_x;
+    y = sin(tA)*(Lb*sin(tB)+Lc*sin(tC)) - m_config.workspace_origin_y;
+    z = Ln+Lb*cos(tB)-Lc*cos(tC) - m_config.workspace_origin_z;
 
 
 
 
+/*
+    std::cout << " xyz "<< x << " " << y << " " << z << std::endl;
+
+    std::cout << " Modified tA, tB, tC: "<< deg(tA) << " " << deg(tB) << " " << deg(tC) << std::endl;
+
+    std::cout << "cos(tA) " << cos(tA) << " Lb: " << Lb << " sin(tB): " << sin(tB)
+              << " Lc:" << Lc << " sin(tC): " << sin(tC) << " origin_x: " << m_config.workspace_origin_x << "\n";
+*/
 
     /*
 
@@ -1267,7 +1290,7 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
     // *** INSERT YOUR CODE HERE ***
 #ifdef USB
-    double encoder_values[] = { hid_to_pc.encoder_a,
+    double encoder_values[] = { -hid_to_pc.encoder_a,
                                 hid_to_pc.encoder_b,
                                 hid_to_pc.encoder_c };
     const pose p = calculate_pose(m_config, encoder_values);
@@ -1285,12 +1308,15 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
     // Starting position 90'
     //tC = tC+3.141592/2;
-    tB = tB + 3.141592/2;
+    //tB = tB + 3.141592/2;
 
     //std::cout << " Modified tA, tB, tC: "<< deg(tA) << " " << deg(tB) << " " << deg(tC) << std::endl;
     //x = cos(tA)*(Lb*sin(tB)+Lc*sin(tC))    - m_config.workspace_origin_x;
     //y = sin(tA)*(Lb*sin(tB)+Lc*sin(tC)) - m_config.workspace_origin_y;
     //z = Ln+Lb*cos(tB)-Lc*cos(tC) - m_config.workspace_origin_z;
+
+     // Mike edition
+    tC = -tC + 3.141592/2;
 
 
 
@@ -1324,7 +1350,7 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
 
     cVector3d f=a_force;
-    f += cVector3d(-0.2,0,0);
+    //f += cVector3d(-0.2,0,0);
     cVector3d t=cTranspose(J)*f;
 
     // Gravity compensation
@@ -1344,11 +1370,13 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
                           mC*Lc_cm*sin(tC) );
 
 
+
+
     // Gear down 
     double motorTorque[] = {
             t.x() * m_config.diameter_capstan_a / m_config.diameter_body_a,
-            t.y() * m_config.diameter_capstan_b / m_config.diameter_body_b,
-            t.z() * m_config.diameter_capstan_c / m_config.diameter_body_c }; // switched sign 2016-05-30
+            -t.y() * m_config.diameter_capstan_b / m_config.diameter_body_b,
+            -t.z() * m_config.diameter_capstan_c / m_config.diameter_body_c }; // switched sign 2016-05-30
 
     // Set motor torque (t)
     double torque_constant[] = { m_config.torque_constant_motor_a, 
@@ -1373,7 +1401,10 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 
 
 #ifdef USB
-       signalToSend[i] = short(motorAmpere*1000);
+        if(motorAmpere>3) motorAmpere = 3;
+        if(motorAmpere<-3) motorAmpere = -3;
+        // 90 % = 3 A set in microcontroller. Escon however configured to 90% = 1A.
+       signalToSend[i] = short(motorAmpere*1000*3);
 #endif
 
 #ifdef PWM

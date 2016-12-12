@@ -100,14 +100,14 @@ struct hid_to_pc_message { // 4*2 = 8 bytes
     short encoder_a;
     short encoder_b;
     short encoder_c;
-    unsigned short debug;
+    short debug;
 };
 
 struct pc_to_hid_message {  // 4*2 = 8 bytes
     short current_motor_a_mA;
     short current_motor_b_mA;
     short current_motor_c_mA;
-    unsigned int debug;
+    short debug;
 };
 
 //------------------------------------------------------------------------------

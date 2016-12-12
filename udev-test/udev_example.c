@@ -105,7 +105,8 @@ int main (void)
 		       "usb_device");
 		if (!dev) {
 			printf("Unable to find parent usb device.");
-			exit(1);
+			//exit(1);
+continue;
 		}
 	
 		/* From here, we can call get_sysattr_value() for each file

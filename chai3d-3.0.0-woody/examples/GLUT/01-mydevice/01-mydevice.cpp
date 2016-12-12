@@ -656,7 +656,7 @@ void updateHaptics(void)
         if (useForceField)
         {
             // compute linear force
-            double Kp = 25; // [N/m]
+            double Kp = 500; // [N/m]
             cVector3d forceField = Kp * (desiredPosition - position);
             force.add(forceField);
 
