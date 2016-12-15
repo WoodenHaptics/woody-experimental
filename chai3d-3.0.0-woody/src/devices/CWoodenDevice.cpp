@@ -1327,8 +1327,11 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
     //z = Ln+Lb*cos(tB)-Lc*cos(tC) - m_config.workspace_origin_z;
 
      // Mike edition
+#ifdef ALUHAPTICS
+    tB = tB + 3.141592/2;
+#else
     tC = -tC + 3.141592/2;
-
+#endif
 
 
 
@@ -1388,6 +1391,14 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
             t.x() * m_config.diameter_capstan_a / m_config.diameter_body_a,
             -t.y() * m_config.diameter_capstan_b / m_config.diameter_body_b,
             -t.z() * m_config.diameter_capstan_c / m_config.diameter_body_c }; // switched sign 2016-05-30
+
+
+#ifdef ALUHAPTICS
+    motorTorque[0] = motorTorque[0];
+    motorTorque[1] = motorTorque[1];
+    motorTorque[2] = -motorTorque[2];
+#endif
+
 
     // Set motor torque (t)
     double torque_constant[] = { m_config.torque_constant_motor_a, 
