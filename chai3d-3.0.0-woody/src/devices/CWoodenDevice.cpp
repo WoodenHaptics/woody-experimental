@@ -69,6 +69,7 @@
 //#define DELAY /// To test delay
 //#define PWM
 //#define SAVE_LOG
+#define ALUHAPTICS
 
 // For delay testing
 #include <chrono>
@@ -819,6 +820,12 @@ pose calculate_pose(const cWoodenDevice::configuration& c, double* encoder_value
         dofAngle[i] = -getMotorAngle(i,cpr[i]) / gearRatio[i];
 #endif
 
+#ifdef ALUHAPTICS
+    dofAngle[0] = -dofAngle[0];
+    dofAngle[1] = dofAngle[1];
+    dofAngle[2] = dofAngle[2];
+#endif
+
     // Calculate dof angles (theta) for each body
     p.Ln = c.length_body_a; 
     p.Lb = c.length_body_b; 
@@ -1004,7 +1011,11 @@ bool cWoodenDevice::getPosition(cVector3d& a_position)
 
 
     // Mike edition
+#ifdef ALUHAPTICS
+    tB = tB + 3.141592/2;
+#else
     tC = -tC + 3.141592/2;
+#endif
     x = cos(tA)*(Lb*sin(tB)+Lc*sin(tC))    - m_config.workspace_origin_x;
     y = sin(tA)*(Lb*sin(tB)+Lc*sin(tC)) - m_config.workspace_origin_y;
     z = Ln+Lb*cos(tB)-Lc*cos(tC) - m_config.workspace_origin_z;
