@@ -15,7 +15,7 @@
 <body>
 
     <h1>WoodenHaptics Simulator</h1>
-	
+	<form action="">
 	<table><tr><td>
 	<p style="text-align:right"> 
 		<X3D xmlns="http://www.web3d.org/specifications/x3d-namespace"  showStat="false" showLog="false" x="0px" y="0px" width="400px" height="400px" altImg="helloX3D-alt.png">
@@ -122,8 +122,8 @@
 	
 	function changeSize(){
 		var L_a = 0.08;
-		var L_b = document.getElementById("blength").value * 0.01;
-		var L_c = document.getElementById("clength").value * 0.01;
+		var L_b = document.getElementById("blength").value * 0.001;
+		var L_c = document.getElementById("clength").value * 0.001;
 		var theta_a = document.getElementById("adeg").value *2*3.141592 / 360.0;
 		var theta_b = document.getElementById("bdeg").value *2*3.141592 / 360.0;
 		var theta_c = document.getElementById("cdeg").value *2*3.141592 / 360.0;
@@ -179,19 +179,20 @@
 	
 	function moveAbout(){
 		var L_a = 0.08;
-		var L_b = document.getElementById("blength").value * 0.01;
-		var L_c = document.getElementById("clength").value * 0.01;
-		var theta_a = 0;
-		var theta_b = 0;
-		var theta_c = 0;
-		
+		var L_b = document.getElementById("blength").value * 0.001;
+		var L_c = document.getElementById("clength").value * 0.001;
+
 		var d = 2*3.141592/360.0;
+		var theta_a = configs[stepCount][0]*d;
+		var theta_b = configs[stepCount][1]*d;
+		var theta_c = configs[stepCount][2]*d;
+
 		var s = stepCount;
 		var skip=15;
 		
-		theta_a = (s%(180/skip)-90/skip)*d*skip;
-		theta_b = ((s/(180/skip)|0)%(90/skip))*d*skip;
-		theta_c = ((s/(180/skip*90/skip)|0)%(90/skip)-45/skip)*d*skip;
+		//theta_a = (s%(180/skip)-90/skip)*d*skip;
+		//theta_b = ((s/(180/skip)|0)%(90/skip))*d*skip;
+		//theta_c = ((s/(180/skip*90/skip)|0)%(90/skip)-45/skip)*d*skip;
 		
 		//18*9*9
 		
@@ -212,7 +213,15 @@
 		
 		var Px = Math.cos(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
 		var Py = Math.sin(theta_a)*(L_b*Math.sin(theta_b)+L_c*Math.cos(theta_b+theta_c));
-		var Pz = L_a + L_b*Math.cos(theta_b)-L_c*Math.sin(theta_b+theta_c);		
+		var Pz = L_a + L_b*Math.cos(theta_b)-L_c*Math.sin(theta_b+theta_c);
+
+		// Find if point is within workspace sphere
+		var x = Px-0.18;
+		var y = Py-0;
+		var z = Pz-0.1;
+		if(x*x + y*y + z*z > 0.14*0.14)
+			return;
+
 		addSphere(Px,Py,Pz);
 
 		
@@ -223,7 +232,7 @@
 		
 		var maxcurrent = parseFloat(document.getElementById("maxcurrent").value);
 		var torquek = parseFloat(document.getElementById("torqueconstant").value);
-		var gearRatioAboutZ = 16;
+		var gearRatioAboutZ = 23;
 		var FmaxY = (gearRatioAboutZ * maxcurrent * torquek * 0.001) / Px;
 		if(FmaxY<minMaxY) {
 			minMaxY = FmaxY;
@@ -265,18 +274,31 @@
 	}
 	
 	var stepCount=0;
-	
-	function animate() {
+	var configs = [];
+
+	var stepMax = 0;
+	function animatethis() {
+		for(var a=-90;a<=90;a+=7.5){
+			for(var b=-45;b<=90;b+=7.5){
+				for(var c=-25;c<=80;c+=7.5){
+					configs.push([a,b,c]);
+					stepMax++;
+				}
+			}
+		}
+
 		step();
 		changeSize();
+
+		return false;
 	}
 	
 	function step() {
-		stepCount++;
 		moveAbout();
-		document.getElementById("otext").innerHTML="Timeframe: " + stepCount.toString();
-		if(stepCount < 180*90*90/(15*15*15))
-			setTimeout(step,1000/60); // 60 fps
+		document.getElementById("otext").innerHTML="Timeframe: " + stepCount.toString() + " of " + stepMax.toString();
+		stepCount++;
+		if(stepCount < stepMax)
+			setTimeout(step,1000/70); // 60 fps
 	}
 	
 	function init(){
@@ -300,15 +322,15 @@
 	Maximum force:  1 N <input type="range" id="maxforce" min="1" max="100" onchange=""/>100 N<br/>
 <br/><br/>
 -->
-	
+
 	<b>Design parameters:</b><br/><br/>
 	Max motor current   <input type="text" id="maxcurrent" value="3.17" size="5" onchange="changeSize();"/> A (Maxon RE40 no. 148877 has 3.17 A continious) <br/> 
 	Motor torque/ampere <input type="text" id="torqueconstant" value="60.3" size="5"  onchange="changeSize();"/> mNm/A (Maxon RE40: 60.3mNm/A) <br/> 
 	<br/>
 	
 	
-    L<sub>b</sub>&nbsp;&nbsp;&nbsp; 5 cm <input type="range" id="blength" min="5" max="35" onchange="changeSize();"/>35 cm<br/>
-    L<sub>c</sub>&nbsp;&nbsp;&nbsp; 5 cm <input type="range" id="clength" min="5" max="35" onchange="changeSize();"/>35 cm<br/>
+    L<sub>b</sub>&nbsp;&nbsp;&nbsp; 50 mm <input type="range" id="blength" min="50" max="350" onchange="changeSize(); blength_val.value = value;"/>350 mm: <output id="blength_val"></output><br/>
+    L<sub>c</sub>&nbsp;&nbsp;&nbsp; 50 mm <input type="range" id="clength" min="50" max="350" onchange="changeSize(); clength_val.value = value;"/>350 mm: <output id="clength_val"></output><br/>
 	<br/><br/>
 	Run-time parameters:<br/>
 	&theta;<sub>a</sub>&nbsp;&nbsp;&nbsp; -90&deg; <input type="range" id="adeg"  name="clength" min="-90" max="90" onchange="changeSize();"/> +90&deg;<br/>
@@ -326,11 +348,11 @@
     </form-->
 	
 	<br/>
-	<input type="submit" value="animate" onclick="animate();"/>
+	<input type="submit" value="animate" onclick="return animatethis();"/>
 	</p>
 	<br/>
-	
-	</td></tr></table>
+
+	</td></tr></table></form>
 	<script type="text/javascript" src="x3dom.js"></script>
    
 
