@@ -67,9 +67,9 @@
 
 #define USB  // define this to use the usb version
 //#define DELAY /// To test delay
-//#define PWM
+//#define PWM        // For PWM from DAQ, do not use with USB
 //#define SAVE_LOG
-#define ALUHAPTICS
+//#define ALUHAPTICS
 
 // For delay testing
 #include <chrono>
@@ -132,12 +132,12 @@ std::string toJSON(const woodenhaptics_message& m) {
 
 cWoodenDevice::configuration default_woody(){
     double data[] = { 0.010, 0.010, 0.010, 
-                      0.080, 0.205, 0.200, 
+                      0.080, 0.205, 0.245,
                       0.160, 0.120, 0.120,
                       0.220, 0.000, 0.080, 0.100, 
-                      0.0603, 0.0603, 0.0603, 3.0, 4096, 2000, 2000, 
-                      12.0, 5000.0, 8.0,
-                      0.170, 0.110, 0.051, 0.091, 9.81};
+                      0.0259, 0.0259, 0.0259, 3.0, 2000, 2000, 2000,
+                      5.0, 1000.0, 8.0,
+                      0.170, 0.110, 0.051, 0.091, 0};
     return cWoodenDevice::configuration(data); 
 }
 
@@ -1425,8 +1425,8 @@ bool cWoodenDevice::setForceAndTorqueAndGripperForce(const cVector3d& a_force,
 #ifdef USB
         if(motorAmpere>3) motorAmpere = 3;
         if(motorAmpere<-3) motorAmpere = -3;
-        // 90 % = 3 A set in microcontroller. Escon however configured to 90% = 1A.
-       signalToSend[i] = short(motorAmpere*1000*3);
+        // 90 % = 3 A set in microcontroller. Escon configured as 90% = 1A.
+       signalToSend[i] = short(motorAmpere*1000);
 #endif
 
 #ifdef PWM
