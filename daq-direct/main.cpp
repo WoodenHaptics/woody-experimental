@@ -4,6 +4,35 @@
 #include <ratio>
 #include "826api.h"
 
+// ******************** FOR LINUX KEYBOARD LOOP BREAK ***********
+#include <stdio.h>
+#include <sys/select.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <stropts.h>
+
+int _kbhit() {
+    static const int STDIN = 0;
+    static bool initialized = false;
+
+    if (! initialized) {
+        // Use termios to turn off line buffering
+        termios term;
+        tcgetattr(STDIN, &term);
+        term.c_lflag &= ~ICANON;
+        tcsetattr(STDIN, TCSANOW, &term);
+        setbuf(stdin, NULL);
+        initialized = true;
+    }
+
+    int bytesWaiting;
+    ioctl(STDIN, FIONREAD, &bytesWaiting);
+    return bytesWaiting;
+}
+// *************************************************************
+
+#include <deque>
+
 using namespace std;
 
 
@@ -36,9 +65,11 @@ void setVolt(double v, int motor){
 
 int main(){
 
+    constexpr int sleep_us = 100;
+    constexpr unsigned int log_entries=100;
 
 
-    int boardflags  = S826_SystemOpen();
+    S826_SystemOpen();
 
     // Initialize counters for channel 0,1,2
     for(unsigned int i=0;i<3;++i){
@@ -58,11 +89,132 @@ int main(){
         S826_DacDataWrite(0,4+i,0xFFFF,0); // Channel 4,5,6 = Pin 41,43,45
     }
 
+    setVolt(0,0);
+
+
+    cout << "Ready?\n";
+
+    // Wait for new key hit
+    while(!_kbhit());
+    char pelle;
+    cin >> pelle;
+
+
+
+    int printcount=0;
+    double prev_deg=0;
+    int active_phase = 1;
+    double goal_deg=0;
+
+    deque<double> error_history;
+
+
+
+
+    while(active_phase){
+        if(_kbhit()){
+            cin >> pelle;
+
+            if(pelle=='2')
+                goal_deg += 5;
+            if(pelle=='1')
+                goal_deg -= 5;
+            if(pelle=='q') {
+                active_phase=0;
+                continue;
+            }
+        }
+
+
+        /*
+        uint ctstamp;
+        uint reason;
+        uint counter;
+        S826_CounterSnapshot(0,0);
+        S826_CounterSnapshotRead(0,0,&counter,&ctstamp,&reason,0);
+
+        uint status;
+        S826_CounterStatusRead(0,0,&status);
+
+        std::cout << " Status: " << (status)  << " Counter: " << counter << std::endl;
+        */
+        double theta = getMotorAngle(0, 4000);
+        double deg = 360.0*theta/(3.141592*2.0);
+
+        // Motor current
+        double current = 0;
+        if(deg < 360 && deg > -360){
+
+            //double goal = (active_phase-1)*10;
+            //if(active_phase == 1) goal = 20;
+            double error = goal_deg-deg;
+
+
+            double sum=0;
+            for(auto e : error_history)
+                sum+=e;
+
+            error_history.push_back(error);
+            double prev_error = goal_deg-prev_deg;
+            if(error_history.size()>log_entries){
+                prev_error = error_history.front();
+                error_history.pop_front();
+            }
+
+
+
+            double delta_t = 0.000001*sleep_us*log_entries;
+            double error_prim = (error - prev_error)/delta_t;
+            double error_integrative = delta_t*(error+prev_error)/2;
+
+            // Exact integrative
+            //error_integrative = sum;
+
+
+            double P = 0.1;
+            double I = 0.1;
+            double D = 0.005;
+
+            current = P*error + I*error_integrative + D*error_prim;
+            if(!(printcount%1000))
+                cout << "Goal: " << goal_deg << " Error: " << error << " P*: " << P*error
+                     << " Ierror: " << error_integrative << " I*: " << I*error_integrative
+                     << " error': " << error_prim << " D*: " << D*error_prim << " \n";
+
+            // max 3 amps
+            if(current>3) current=3;
+            if(current<-3) current =-3;
+
+        }
+        double signal = -10*current/3; // volt signal 10 gives 3 amps.
+        setVolt(signal,0);
+
+        //cout << 10*i/3 << "\n";
+        //setVolt(0.0,0); // 10 = 3A, 1=0.3A
+
+        if(!(printcount++%1000))
+            cout << "Angle: " << theta << " rad  " << deg << " deg. Current: " << current << " amps (signal: " << signal <<  " v)\n\n";
+
+
+        prev_deg = deg;
+
+        // Sleep 1ms
+        using namespace std::chrono;
+        duration<int, std::micro> d{sleep_us};
+        std::this_thread::sleep_for(d);
+    }
+
+
 
     // Disable power
     S826_DacDataWrite(0,4,0x0,0); // Channel 4 = Pin 41
     S826_DacDataWrite(0,5,0x0,0); // Channel 5 = Pin 43
     S826_DacDataWrite(0,6,0x0,0); // Channel 6 = Pin 45
+
+    cout << "Done.\n";
+
+    // Wait for new key hit
+    while(!_kbhit());
 
 
 
