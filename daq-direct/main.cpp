@@ -4,6 +4,16 @@
 #include <ratio>
 #include "826api.h"
 
+
+
+
+// ******************** SELECT PROGRAM TO RUN  ******************
+//#define JUST_COUNT
+
+// **************************************************************
+
+
+
 // ******************** FOR LINUX KEYBOARD LOOP BREAK ***********
 #include <stdio.h>
 #include <sys/select.h>
@@ -44,10 +54,15 @@ double getMotorAngle(int motor, double cpr) {
     const unsigned int maxdata = 0xFFFFFFFF; // 32 bit
 
     uint encoderValue;
-    S826_CounterSnapshot(0,motor);
     uint ctstamp;
     uint reason;
+    S826_CounterSnapshot(0,motor);
     S826_CounterSnapshotRead(0,motor,&encoderValue,&ctstamp,&reason,0);
+
+    uint status;
+    S826_CounterStatusRead(0,0,&status);
+    //std::cout << "Reading from channel: " << motor << " Status: " << (status)  << " Counter: " << encoderValue << std::endl;
+
 
     if(encoderValue >= maxdata/2)
         return -1.0*2.0*pi*(maxdata-encoderValue)/cpr;
@@ -66,7 +81,7 @@ void setVolt(double v, int motor){
 int main(){
 
     constexpr int sleep_us = 100;
-    constexpr unsigned int log_entries=100;
+    constexpr unsigned int log_entries=10;
 
 
     S826_SystemOpen();
@@ -125,21 +140,27 @@ int main(){
             }
         }
 
-
-        /*
+//#define JUST_COUNT
+#ifdef JUST_COUNT
         uint ctstamp;
         uint reason;
         uint counter;
-        S826_CounterSnapshot(0,0);
-        S826_CounterSnapshotRead(0,0,&counter,&ctstamp,&reason,0);
+        constexpr uint chan = 0;
+        S826_CounterSnapshot(0,chan);
+        S826_CounterSnapshotRead(0,chan,&counter,&ctstamp,&reason,0);
 
         uint status;
         S826_CounterStatusRead(0,0,&status);
 
-        std::cout << " Status: " << (status)  << " Counter: " << counter << std::endl;
-        */
-        double theta = getMotorAngle(0, 4000);
-        double deg = 360.0*theta/(3.141592*2.0);
+
+        std::cout << "Reading from channel: " << chan << " Status: " << (status)  << " Counter: " << counter << std::endl;
+        //continue;
+
+#endif
+        const double theta = getMotorAngle(0, 4000);
+        //std::cout << theta << "\n";
+        const double deg = 360.0*theta/(3.141592*2.0);
+
 
         // Motor current
         double current = 0;
@@ -172,11 +193,11 @@ int main(){
 
 
             double P = 0.1;
-            double I = 0.1;
-            double D = 0.005;
+            double I = 0.0;
+            double D = 0.0005;
 
             current = P*error + I*error_integrative + D*error_prim;
-            if(!(printcount%1000))
+            if(!(printcount%100))
                 cout << "Goal: " << goal_deg << " Error: " << error << " P*: " << P*error
                      << " Ierror: " << error_integrative << " I*: " << I*error_integrative
                      << " error': " << error_prim << " D*: " << D*error_prim << " \n";
@@ -192,7 +213,7 @@ int main(){
         //cout << 10*i/3 << "\n";
         //setVolt(0.0,0); // 10 = 3A, 1=0.3A
 
-        if(!(printcount++%1000))
+        if(!(printcount++%100))
             cout << "Angle: " << theta << " rad  " << deg << " deg. Current: " << current << " amps (signal: " << signal <<  " v)\n\n";
 
 
