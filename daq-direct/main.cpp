@@ -8,7 +8,7 @@
 
 
 // ******************** SELECT PROGRAM TO RUN  ******************
-//#define JUST_COUNT
+#define JUST_COUNT
 
 // **************************************************************
 
@@ -61,7 +61,7 @@ double getMotorAngle(int motor, double cpr) {
 
     uint status;
     S826_CounterStatusRead(0,0,&status);
-    //std::cout << "Reading from channel: " << motor << " Status: " << (status)  << " Counter: " << encoderValue << std::endl;
+    //std::cout << "Reading from channel: " << motor << " Status: " << (status)  << " Counter: " << encoderValue <<  std::endl;
 
 
     if(encoderValue >= maxdata/2)
@@ -88,10 +88,27 @@ int main(){
 
     // Initialize counters for channel 0,1,2
     for(unsigned int i=0;i<3;++i){
-        S826_CounterFilterWrite(0,i,0);
+
+        constexpr uint multiples_of_20ns = 65535; // = 1.3107 ms (maximum)
+        constexpr uint ENABLE_IX_FILTER = (1 << 31);
+        constexpr uint ENABLE_CK_FILTER = (1 << 30);
+
+        //S826_CounterFilterWrite(0,i,0);
+        S826_CounterFilterWrite(0,i,multiples_of_20ns | ENABLE_IX_FILTER);
+
+
         S826_CounterModeWrite(0,i,0x70);
         S826_CounterPreloadWrite(0,i,0,0); // Load 0
         S826_CounterPreload(0,i,0,0);
+
+
+        // Configure snapshot to occur when IX signal either rises or falls,
+        // this is to get a callback when i.e. a button is pressed that we
+        // have wired to IX channel (since we are not using the encoder's IX)
+        S826_CounterSnapshotConfigWrite(0, i, S826_SSRMASK_IXRISE |
+                                              S826_SSRMASK_IXFALL, S826_BITWRITE);
+
+        // Enable
         S826_CounterStateWrite(0,i,1);
 
         // And range of analoge signal to escon
@@ -140,21 +157,45 @@ int main(){
             }
         }
 
-//#define JUST_COUNT
 #ifdef JUST_COUNT
         uint ctstamp;
         uint reason;
         uint counter;
         constexpr uint chan = 0;
-        S826_CounterSnapshot(0,chan);
-        S826_CounterSnapshotRead(0,chan,&counter,&ctstamp,&reason,0);
+        int a = S826_CounterSnapshotRead(0,chan,&counter,&ctstamp,&reason,100000);
+        if(a != S826_ERR_NOTREADY){ // nothing in buffer
+            // do counter snapshot
+            //S826_CounterSnapshot(0,chan);
+            //a = S826_CounterSnapshotRead(0,chan,&counter,&ctstamp,&reason,0);
+            std::cout << a << " Reading from channel: " << chan << " Reason: " << reason << " Counter: " << counter << std::endl;
 
-        uint status;
-        S826_CounterStatusRead(0,0,&status);
+        }
 
 
-        std::cout << "Reading from channel: " << chan << " Status: " << (status)  << " Counter: " << counter << std::endl;
-        //continue;
+        //uint status;
+        //S826_CounterStatusRead(0,0,&status);
+
+
+        //if(reason!=128)
+        //if(reason!=128){
+            //while(!_kbhit());
+            //char pelle;
+            //cin >> pelle;
+        //    std::cout << "\n\n";
+        //}
+        //std::cout << a << " Reading from channel: " << chan << " Status: " << (status) << " Reason: " << reason << " Counter: " << counter << std::endl;
+
+        uint counts;
+        S826_CounterRead(0,0,&counts);
+        std::cout << "counts: " << counts << "\n";
+
+
+        // Sleep 1ms
+        //using namespace std::chrono;
+        //duration<int, std::micro> dd{10000};
+        //std::this_thread::sleep_for(dd);
+
+        continue;
 
 #endif
         const double theta = getMotorAngle(0, 4000);
