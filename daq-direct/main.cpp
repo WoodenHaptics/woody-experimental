@@ -8,8 +8,8 @@
 
 
 // ******************** SELECT PROGRAM TO RUN  ******************
-//#define JUST_COUNT
-
+#define JUST_COUNT
+int chosen_motor = 0;
 // **************************************************************
 
 
@@ -61,7 +61,7 @@ double getMotorAngle(int motor, double cpr) {
 
     uint status;
     S826_CounterStatusRead(0,0,&status);
-    //std::cout << "Reading from channel: " << motor << " Status: " << (status)  << " Counter: " << encoderValue << std::endl;
+    //std::cout << "Reading from channel: " << motor << " Status: " << (status)  << " Counter: " << encoderValue <<  std::endl;
 
 
     if(encoderValue >= maxdata/2)
@@ -78,7 +78,13 @@ void setVolt(double v, int motor){
 }
 
 
-int main(){
+int main(int argc, char** argv) {
+    std::cout << "Have " << argc << " arguments:" << std::endl;
+    for (int i = 0; i < argc; ++i) {
+        std::cout << argv[i] << std::endl;
+    }
+    if(argc>1) chosen_motor = atoi(argv[1]);
+
 
     constexpr int sleep_us = 100;
     constexpr unsigned int log_entries=10;
@@ -86,14 +92,33 @@ int main(){
 
     S826_SystemOpen();
 
-    // Initialize counters for channel 0,1,2
-    for(unsigned int i=0;i<3;++i){
+    // Initialize counters for channel 0,1,2 AND 3,4,5 (gimbal)
+    for(unsigned int i=0;i<6;++i){
+
+        constexpr uint multiples_of_20ns = 100;//65535; // = 1.3107 ms (maximum)
+        constexpr uint ENABLE_IX_FILTER = (1 << 31);
+        constexpr uint ENABLE_CK_FILTER = (1 << 30);
+
         S826_CounterFilterWrite(0,i,0);
+        S826_CounterFilterWrite(0,i,multiples_of_20ns | ENABLE_IX_FILTER | ENABLE_CK_FILTER);
+
+
         S826_CounterModeWrite(0,i,0x70);
         S826_CounterPreloadWrite(0,i,0,0); // Load 0
         S826_CounterPreload(0,i,0,0);
+
+
+        // Configure snapshot to occur when IX signal either rises or falls,
+        // this is to get a callback when i.e. a button is pressed that we
+        // have wired to IX channel (since we are not using the encoder's IX)
+        //S826_CounterSnapshotConfigWrite(0, i, S826_SSRMASK_IXRISE |
+        //                                      S826_SSRMASK_IXFALL, S826_BITWRITE);
+
+        // Enable
         S826_CounterStateWrite(0,i,1);
 
+    }
+    for(unsigned int i=0;i<3;++i){
         // And range of analoge signal to escon
         S826_DacRangeWrite(0,i,3,0); //-10 to 10 V
 
@@ -102,6 +127,7 @@ int main(){
         // analgoue and encoder breakout board of the S826.
         //
         S826_DacDataWrite(0,4+i,0xFFFF,0); // Channel 4,5,6 = Pin 41,43,45
+
     }
 
     setVolt(0,0);
@@ -125,6 +151,7 @@ int main(){
 
 
 
+    std::cout << "hej\n";
 
     while(active_phase){
         if(_kbhit()){
@@ -140,24 +167,55 @@ int main(){
             }
         }
 
-//#define JUST_COUNT
 #ifdef JUST_COUNT
         uint ctstamp;
         uint reason;
         uint counter;
-        constexpr uint chan = 0;
-        S826_CounterSnapshot(0,chan);
-        S826_CounterSnapshotRead(0,chan,&counter,&ctstamp,&reason,0);
+        const uint chan = chosen_motor;
 
-        uint status;
-        S826_CounterStatusRead(0,0,&status);
+        for(int ix=0;ix<6;++ix){
+            int a = S826_CounterSnapshotRead(0,ix,&counter,&ctstamp,&reason,10000);
+            if(a != S826_ERR_NOTREADY){ // nothing in buffer
+                // do counter snapshot
+                //S826_CounterSnapshot(0,chan);
+                //a = S826_CounterSnapshotRead(0,chan,&counter,&ctstamp,&reason,0);
+                std::cout << a << " INDEX! Reading from channel: " << ix << " Reason: " << reason << " Counter: " << counter << std::endl;
+                //std::cout << "hej\n";
+            }
+        }
 
 
-        std::cout << "Reading from channel: " << chan << " Status: " << (status)  << " Counter: " << counter << std::endl;
-        //continue;
+        //uint status;
+        //S826_CounterStatusRead(0,0,&status);
+
+
+        //if(reason!=128)
+        //if(reason!=128){
+            //while(!_kbhit());
+            //char pelle;
+            //cin >> pelle;
+        //    std::cout << "\n\n";
+        //}
+
+
+        //std::cout << a << " Reading from channel: " << chan << " Reason: " << reason << " Counter: " << counter << std::endl;
+
+        uint counts;
+        S826_CounterRead(0,chan,&counts);
+        std::cout << "counts: " << counts << " chan: " << chan << "\n";
+
+        S826_CounterRead(0,1,&counts);
+        std::cout << "counts: " << counts << " chan: 1\n";
+
+        // Sleep 1ms
+        //using namespace std::chrono;
+        //duration<int, std::micro> dd{10000};
+        //std::this_thread::sleep_for(dd);
+
+        continue;
 
 #endif
-        const double theta = getMotorAngle(0, 4000);
+        const double theta = getMotorAngle(chosen_motor, 4000);
         //std::cout << theta << "\n";
         const double deg = 360.0*theta/(3.141592*2.0);
 
@@ -208,7 +266,7 @@ int main(){
 
         }
         double signal = -10*current/3; // volt signal 10 gives 3 amps.
-        setVolt(signal,0);
+        setVolt(signal,chosen_motor);
 
         //cout << 10*i/3 << "\n";
         //setVolt(0.0,0); // 10 = 3A, 1=0.3A
