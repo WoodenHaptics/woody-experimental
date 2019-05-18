@@ -1,20 +1,28 @@
- 
-Mbed code used 
+Mbed code used for USB HID Interface. 
 
-Actually hosted on:
+Also hosted on:
 https://developer.mbed.org/users/jofo/code/WoodenHapticsHID/
 
-Here for archiving reasons.
+The WoodenHapticsHID folder is an export from the above url using
+the mbed compilers export utility, and specifying qtcreator as toolchain.
+Qtcreator only facilitates coding, make utility is enough.
+To build locally:
 
-Version as of 2016-12-13 works with chai3d-3.0.0-woody with 
-yesterday (2016-12-12) commit/revision. Please note that 
-this whole thing will be cleaned up etc, but for your reference its here.
+make
+
+Note: you may need the gcc-arm compiler
+
+NOTE: We provide the binary here as well, just drag and drop to your mbed
+in order to use it!
+
+Latest version is the WoodenHapticsHID.bin
+
+The file working-2016-12-15.bin is stored here and is reported to
+work with with chai3d-3.0.0-woody with (2016-12-12) commit. 
 
 Dependenices:
  * https://developer.mbed.org/users/mbed_official/code/USBDevice/
  * https://developer.mbed.org/users/Sissors/code/FastPWM/
  * https://developer.mbed.org/users/mbed_official/code/mbed/
-
-Compile in your web browser (developer.mbed.org)
 
 Jonas

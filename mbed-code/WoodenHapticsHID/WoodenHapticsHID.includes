@@ -1,0 +1,16 @@
+
+/FastPWM
+/USBDevice
+/USBDevice/USBAudio
+/USBDevice/USBDevice
+/USBDevice/USBHID
+/USBDevice/USBMIDI
+/USBDevice/USBMSD
+/USBDevice/USBSerial
+/USBDevice/targets/TARGET_NXP
+/usr/src/mbed-sdk
+mbed
+mbed/TARGET_LPC1768/TOOLCHAIN_GCC_ARM
+mbed/drivers
+mbed/hal
+mbed/platform
